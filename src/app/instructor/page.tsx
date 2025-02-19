@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -22,7 +22,7 @@ type AvailabilityPattern = {
   timeRangeId: string;
   start: string;
   end: string;
-  type: 'days' | 'weeks' | 'months';
+  type: 'days' | 'weeks' | 'months' | 'weekends';
 };
 
 const COLORS = [
@@ -43,7 +43,8 @@ export default function InstructorDashboard() {
 
   const [patterns, setPatterns] = useState<AvailabilityPattern[]>([]);
   const [selectedTimeRange, setSelectedTimeRange] = useState<string>('1');
-  const [selectedType, setSelectedType] = useState<'days' | 'weeks' | 'months'>('days');
+  const [selectedType, setSelectedType] = useState<'days' | 'weeks' | 'months' | 'weekends'>('days');
+
 
   const addTimeRange = () => {
     const newTimeRange = {
@@ -113,14 +114,10 @@ export default function InstructorDashboard() {
     const startDate = new Date(selectInfo.start);
     let endDate = new Date(selectInfo.end);
 
-    console.log('Initial dates:', { startDate, endDate });
-    console.log('Selection type:', selectedType);
-
     switch (selectedType) {
       case 'months': {
         startDate.setDate(1);
         endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
-        console.log('Month selection:', { startDate, endDate });
         break;
       }
       case 'weeks': {
@@ -129,16 +126,23 @@ export default function InstructorDashboard() {
         startDate.setDate(diff);
         endDate = new Date(startDate);
         endDate.setDate(startDate.getDate() + 4);
-        console.log('Week selection:', { startDate, endDate });
+        break;
+      }
+      case 'weekends': {
+        const day = startDate.getDay();
+        if (day === 6) { // Saturday
+          endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + 1);
+        } else if (day === 0) { // Sunday
+          startDate.setDate(startDate.getDate() - 1);
+          endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + 1);
+        }
         break;
       }
       case 'days':
       default: {
-        if (startDate.getTime() === endDate.getTime()) {
-          endDate = new Date(startDate);
-          endDate.setDate(startDate.getDate());
-          console.log('Day selection:', { startDate, endDate });
-        }
+        endDate = new Date(startDate);
         break;
       }
     }
@@ -146,17 +150,64 @@ export default function InstructorDashboard() {
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(23, 59, 59, 999);
 
-    console.log('Final dates:', { startDate, endDate });
     return { startDate, endDate };
+  };
+
+  const hasOverlap = (start: Date, end: Date) => {
+    console.log('Checking for overlapping patterns between:', start, 'and', end);
+    const overlappingPatterns = patterns.filter(pattern => {
+      const patternStart = new Date(pattern.start);
+      const patternEnd = new Date(pattern.end);
+      console.log('Checking pattern:', pattern.id);
+      console.log('Pattern start:', patternStart);
+      console.log('Pattern end:', patternEnd);
+      const hasOverlap = (
+        (start <= patternEnd && start >= patternStart) ||
+        (end <= patternEnd && end >= patternStart) ||
+        (start <= patternStart && end >= patternEnd)
+      );
+      console.log('Has overlap:', hasOverlap);
+      return hasOverlap;
+    });
+
+    console.log('Found overlapping patterns:', overlappingPatterns.length);
+    if (overlappingPatterns.length === 0) return false;
+
+    const allContained = overlappingPatterns.every(pattern => {
+      const patternStart = new Date(pattern.start);
+      console.log('Checking if pattern is contained:', pattern.id);
+      console.log('Pattern start:', patternStart);
+      const isContained = start <= patternStart && end >= patternStart;
+      console.log('Is contained:', isContained);
+      return isContained;
+    });
+
+    console.log('All patterns contained:', allContained);
+    if (allContained) {
+      console.log('Removing contained patterns');
+      setPatterns(patterns.filter(pattern => 
+        !overlappingPatterns.some(op => op.id === pattern.id)
+      ));
+      return false;
+    }
+
+    return true;
   };
 
   const handleSelect = (selectInfo: DateSelectArg) => {
     const timeRange = timeRanges.find(r => r.id === selectedTimeRange);
-    console.log('Selected time range:', timeRange);
     if (!timeRange) return;
-    console.log('Selected time range:', timeRange);
 
     const { startDate, endDate } = computeSelectionDates(selectInfo);
+
+    if (hasOverlap(startDate, endDate)) {
+      alert('This time period overlaps with existing availability. Please select a different period.');
+      selectInfo.view.calendar.unselect();
+      return;
+    }
+
+
+    console.log('Adding new pattern:', { startDate, endDate, selectedType });
 
     const newPattern: AvailabilityPattern = {
       id: uuidv4(),
@@ -180,6 +231,12 @@ export default function InstructorDashboard() {
     setPatterns(patterns.filter(pattern => pattern.id !== patternId));
   };
 
+  const clearAllPatterns = () => {
+    if (confirm('Are you sure you want to delete all patterns?')) {
+      setPatterns([]);
+    }
+  };
+
   const calendarEvents = patterns.map(pattern => {
     const timeRange = timeRanges.find(r => r.id === pattern.timeRangeId);
     return {
@@ -197,8 +254,54 @@ export default function InstructorDashboard() {
   const selectionTypes = [
     { value: 'days', label: 'Day Selection' },
     { value: 'weeks', label: 'Week Selection' },
-    { value: 'months', label: 'Month Selection' }
+    { value: 'months', label: 'Month Selection' },
+    { value: 'weekends', label: 'Weekend Selection' }
   ] as const;
+
+  useEffect(() => {
+    
+    console.log('Patterns:', patterns);
+    const optimizePatterns = () => {
+      const sortedPatterns = [...patterns].sort((a, b) => 
+        new Date(a.start).getTime() - new Date(b.start).getTime()
+      );
+
+      let optimized = false;
+      for (let i = 0; i < sortedPatterns.length - 1; i++) {
+        console.log('Optimizing patterns:', { i, sortedPatterns });
+        const current = sortedPatterns[i];
+        const next = sortedPatterns[i + 1];
+
+        if (current.timeRangeId === next.timeRangeId) {
+          const currentEnd = new Date(current.end);
+          const nextStart = new Date(next.start);
+          const nextEnd = new Date(next.end);
+          
+          if (currentEnd.getTime() >= nextStart.getTime() - 86400000) {
+            const mergedPattern = {
+              id: current.id,
+              timeRangeId: current.timeRangeId,
+              start: current.start,
+              end: currentEnd.getTime() > nextEnd.getTime() ? current.end : next.end,
+              type: current.type
+            };
+            
+            sortedPatterns.splice(i, 2, mergedPattern);
+            optimized = true;
+            break;
+          }
+        }
+      }
+
+      if (optimized) {
+        console.log('Patterns optimized:', sortedPatterns);
+        setPatterns(sortedPatterns);
+      }
+    };
+
+    console.log('Running pattern optimization');
+    optimizePatterns();
+  }, [patterns]);
 
   return (
     <main className="p-6">
@@ -330,10 +433,10 @@ export default function InstructorDashboard() {
             firstDay={1}
             selectConstraint={{
               start: '00:00',
-              end: '24:00',
+              end: '00:00',
               daysOfWeek: [1, 2, 3, 4, 5, 6, 0]
             }}
-            selectOverlap={true}
+            selectOverlap={false}
             unselectAuto={false}
             selectMinDistance={0}
             selectLongPressDelay={0}
@@ -342,15 +445,15 @@ export default function InstructorDashboard() {
             selectAllow={(selectInfo) => {
               const start = new Date(selectInfo.start);
               const end = new Date(selectInfo.end);
-
-              console.log('Start date:', start);
-              console.log('End date:', end);
               
               if (selectedType === 'months') {
                 return start.getDate() <= 7;
               }
               if (selectedType === 'weeks') {
                 return start.getDay() === 1;
+              }
+              if (selectedType === 'weekends') {
+                return start.getDay() === 6 || start.getDay() === 0;
               }
               return true;
             }}
@@ -359,7 +462,15 @@ export default function InstructorDashboard() {
       </div>
 
       <div>
-        <h2 className="text-xl font-semibold mb-4">Saved Patterns</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Saved Patterns</h2>
+          <button
+            onClick={clearAllPatterns}
+            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+          >
+            Delete All Patterns
+          </button>
+        </div>
         <div className="space-y-2">
           {patterns.map((pattern) => {
             const timeRange = timeRanges.find(r => r.id === pattern.timeRangeId);
