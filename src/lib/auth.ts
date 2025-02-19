@@ -1,4 +1,5 @@
 import { supabase } from "./supbase/client"
+import { SendMailClient } from "zeptomail"
 
 export type UserRole = 'instructor' | 'client'
 
@@ -101,6 +102,35 @@ export async function signOut() {
 export async function getSession() {
   const { data: { session }, error } = await supabase.auth.getSession()
   return { session, error }
+}
+export async function sendEmail(to: string, subject: string, htmlBody: string) {
+  const url = "api.zeptomail.com/"
+  const token = "Zoho-enczapikey wSsVR60g+0T4B/x8zTWpI+wwyFVRBl/0HUR52wCo6SL9FvGX8sdvlxKcV1WgSaMXEDNqRe1U4J3x17qnvhDzMWm9ZlxONJIoPxQ9qnGRgF88n+g=="
+
+  const client = new SendMailClient({url, token})
+
+  try {
+    const response = await client.sendMail({
+      from: {
+        address: "noreply@agfarms.dev",
+        name: "noreply"
+      },
+      to: [
+        {
+          email_address: {
+            address: to,
+            name: to.split('@')[0]
+          }
+        }
+      ],
+      subject,
+      htmlbody: htmlBody
+    })
+    
+    return { data: response, error: null }
+  } catch (error) {
+    return { data: null, error }
+  }
 }
 
 // Remove or comment out the separate signInWithGoogle function since it's no longer needed
