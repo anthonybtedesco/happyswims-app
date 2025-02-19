@@ -53,7 +53,7 @@ export const colors = {
   common: {
     white: '#f9fafb',
     black: '#00a0aa',
-    background: '#fec320',
+    background: '#ffffff',
     paper: '#f9fafb'
   },
 
