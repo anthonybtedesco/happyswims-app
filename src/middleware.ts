@@ -86,7 +86,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect('http://book.happyswims.life')
   }
 
-  if (subdomain === 'book' && userRole !== 'client') {
+  if (subdomain === 'book' && userRole === 'client') {
     return NextResponse.redirect('http://book.happyswims.life')
   }
 
