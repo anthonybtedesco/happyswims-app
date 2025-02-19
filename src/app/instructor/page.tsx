@@ -6,6 +6,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import { DateSelectArg, EventClickArg, EventContentArg, DatesSetArg } from '@fullcalendar/core';
 import { v4 as uuidv4 } from 'uuid';
 import { colors } from '@/lib/colors';
+import { supabase } from '@/lib/supbase/client';
 
 type TimeRange = {
   id: string;
@@ -40,11 +41,156 @@ export default function InstructorDashboard() {
     }],
     color: COLORS[0]
   }]);
-
   const [patterns, setPatterns] = useState<AvailabilityPattern[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedTimeRange, setSelectedTimeRange] = useState<string>('1');
   const [selectedType, setSelectedType] = useState<'days' | 'weeks' | 'months' | 'weekends'>('days');
+  const [instructor, setInstructor] = useState<any | null>(null);
 
+  useEffect(() => {
+    const fetchInstructor = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data: instructor, error } = await supabase
+        .from('instructor')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching instructor:', error);
+        return;
+      }
+
+      setInstructor(instructor);
+    };
+
+    fetchInstructor();
+    loadAvailability();
+  }, []);
+
+  const loadAvailability = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('availability')
+        .select('*')
+        .order('start_date', { ascending: true });
+
+      if (error) throw error;
+
+      if (data) {
+        const loadedPatterns = data.map(item => ({
+          id: item.id,
+          timeRangeId: item.instructor_id,
+          start: item.start_date,
+          end: item.end_date,
+          type: 'days' as const
+        }));
+
+        const loadedTimeRanges = data.reduce<TimeRange[]>((acc, item) => {
+          if (!acc.some(r => r.id === item.instructor_id)) {
+            const timeRange = {
+              id: item.instructor_id,
+              splits: decodeBytea(item.timerange),
+              color: item.color
+            };
+            acc.push(timeRange);
+          }
+          return acc;
+        }, []);
+
+        setPatterns(loadedPatterns);
+        if (loadedTimeRanges.length > 0) {
+          setTimeRanges(loadedTimeRanges);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading availability:', error);
+      alert('Failed to load availability');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const encodeSplitsToBytea = (splits: { startTime: string; endTime: string }[]) => {
+    const bits = new Array(96).fill('0');
+    
+    splits.forEach(split => {
+      const startBlocks = timeToBlocks(split.startTime);
+      const endBlocks = timeToBlocks(split.endTime);
+      
+      for (let i = startBlocks; i < endBlocks; i++) {
+        bits[i] = '1';
+      }
+    });
+    
+    return bits.join('');
+  };
+
+  const decodeBytea = (timerange: string) => {
+    const bits = timerange.split('');
+    const splits: { id: string; startTime: string; endTime: string }[] = [];
+    let start = -1;
+    
+    for (let i = 0; i <= bits.length; i++) {
+      if (i < bits.length && bits[i] === '1' && start === -1) {
+        start = i;
+      } else if ((i === bits.length || bits[i] === '0') && start !== -1) {
+        splits.push({
+          id: uuidv4(),
+          startTime: blocksToTime(start),
+          endTime: blocksToTime(i)
+        });
+        start = -1;
+      }
+    }
+    
+    return splits;
+  };
+
+  const saveAvailability = async () => {
+    try {
+      // Delete existing availability
+      await supabase
+        .from('availability')
+        .delete()
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id);
+
+      // Insert new availability
+      const availabilityData = patterns.map(pattern => {
+        const timeRange = timeRanges.find(r => r.id === pattern.timeRangeId);
+        return {
+          instructor_id: instructor.id,
+          start_date: pattern.start,
+          end_date: pattern.end,
+          timerange: encodeSplitsToBytea(timeRange?.splits || []),
+          color: timeRange?.color || COLORS[0]
+        };
+      });
+
+      const { error } = await supabase
+        .from('availability')
+        .insert(availabilityData);
+
+      if (error) throw error;
+      alert('Availability saved successfully');
+    } catch (error) {
+      console.error('Error saving availability:', error);
+      alert('Failed to save availability');
+    }
+  };
+
+  const timeToBlocks = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return (hours * 4) + Math.floor(minutes / 15);
+  };
+
+  const blocksToTime = (blocks: number) => {
+    const hours = Math.floor(blocks / 4);
+    const minutes = (blocks % 4) * 15;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  };
 
   const addTimeRange = () => {
     const newTimeRange = {
@@ -305,199 +451,212 @@ export default function InstructorDashboard() {
 
   return (
     <main className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Instructor Dashboard</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Instructor Dashboard</h1>
+        <button
+          onClick={saveAvailability}
+          className="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600"
+        >
+          Save Availability
+        </button>
+      </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div>
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">Time Ranges</h2>
-            <div className="space-y-6">
-              {timeRanges.map(range => (
-                <div key={range.id} className="p-4 border rounded space-y-4">
-                  <div 
-                    className="w-full h-2 rounded-full mb-4" 
-                    style={{ backgroundColor: range.color }}
-                  />
-                  {range.splits.map(split => (
-                    <div key={split.id} className="flex items-center gap-4">
-                      <input
-                        type="time"
-                        value={split.startTime}
-                        onChange={(e) => updateTimeSplit(range.id, split.id, 'startTime', e.target.value)}
-                        className="p-2 border rounded"
-                        style={{ backgroundColor: colors.common.white }}
+      {loading ? (
+        <div>Loading...</div>
+      ) : (
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold mb-4">Time Ranges</h2>
+                <div className="space-y-6">
+                  {timeRanges.map(range => (
+                    <div key={range.id} className="p-4 border rounded space-y-4">
+                      <div 
+                        className="w-full h-2 rounded-full mb-4" 
+                        style={{ backgroundColor: range.color }}
                       />
-                      <span>to</span>
-                      <input
-                        type="time"
-                        value={split.endTime}
-                        onChange={(e) => updateTimeSplit(range.id, split.id, 'endTime', e.target.value)}
-                        className="p-2 border rounded"
-                        style={{ backgroundColor: colors.common.white, colorScheme: 'dark' }}
-
-                      />
-                      {range.splits.length > 1 && (
+                      {range.splits.map(split => (
+                        <div key={split.id} className="flex items-center gap-4">
+                          <input
+                            type="time"
+                            value={split.startTime}
+                            onChange={(e) => updateTimeSplit(range.id, split.id, 'startTime', e.target.value)}
+                            className="p-2 border rounded"
+                            style={{ backgroundColor: colors.common.white }}
+                          />
+                          <span>to</span>
+                          <input
+                            type="time"
+                            value={split.endTime}
+                            onChange={(e) => updateTimeSplit(range.id, split.id, 'endTime', e.target.value)}
+                            className="p-2 border rounded"
+                            style={{ backgroundColor: colors.common.white, colorScheme: 'dark' }}
+                          />
+                          {range.splits.length > 1 && (
+                            <button
+                              onClick={() => removeTimeSplit(range.id, split.id)}
+                              className="p-2 text-red-500 hover:text-red-700"
+                            >
+                              Remove Split
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <div className="flex gap-4">
                         <button
-                          onClick={() => removeTimeSplit(range.id, split.id)}
-                          className="p-2 text-red-500 hover:text-red-700"
+                          onClick={() => addTimeSplit(range.id)}
+                          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                         >
-                          Remove Split
+                          Add Split
                         </button>
-                      )}
+                        <button
+                          onClick={() => removeTimeRange(range.id)}
+                          className="text-red-500 hover:text-red-700 px-4 py-2"
+                        >
+                          Remove Range
+                        </button>
+                      </div>
                     </div>
                   ))}
-                  <div className="flex gap-4">
-                    <button
-                      onClick={() => addTimeSplit(range.id)}
-                      className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                  <button
+                    onClick={addTimeRange}
+                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                  >
+                    Add Time Range
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold mb-4">Set Availability</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block mb-2">Select Time Range</label>
+                    <select
+                      value={selectedTimeRange}
+                      onChange={(e) => setSelectedTimeRange(e.target.value)}
+                      className="w-full p-2 border rounded"
                     >
-                      Add Split
-                    </button>
-                    <button
-                      onClick={() => removeTimeRange(range.id)}
-                      className="text-red-500 hover:text-red-700 px-4 py-2"
-                    >
-                      Remove Range
-                    </button>
+                      {timeRanges.map(range => (
+                        <option key={range.id} value={range.id}>
+                          {range.splits.map(split => 
+                            `${split.startTime} - ${split.endTime}`
+                          ).join(', ')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block mb-2">Selection Type</label>
+                    <div className="flex gap-2">
+                      {selectionTypes.map(type => (
+                        <button
+                          key={type.value}
+                          onClick={() => setSelectedType(type.value)}
+                          className={`flex-1 px-4 py-2 rounded transition-colors ${
+                            selectedType === type.value
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                          }`}
+                        >
+                          {type.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              ))}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-end gap-2">
+                <div className="text-sm text-gray-600">
+                  Current Mode: {selectionTypes.find(t => t.value === selectedType)?.label}
+                </div>
+              </div>
+              <FullCalendar
+                plugins={[dayGridPlugin, interactionPlugin]}
+                initialView="dayGridMonth"
+                selectable={true}
+                selectMirror={true}
+                dayMaxEvents={true}
+                weekends={true}
+                events={calendarEvents}
+                select={handleSelect}
+                eventClick={handleEventClick}
+                height="auto"
+                firstDay={1}
+                selectConstraint={{
+                  start: '00:00',
+                  end: '00:00',
+                  daysOfWeek: [1, 2, 3, 4, 5, 6, 0]
+                }}
+                selectOverlap={false}
+                unselectAuto={false}
+                selectMinDistance={0}
+                selectLongPressDelay={0}
+                longPressDelay={0}
+                eventDisplay="block"
+                selectAllow={(selectInfo) => {
+                  const start = new Date(selectInfo.start);
+                  const end = new Date(selectInfo.end);
+                  
+                  if (selectedType === 'months') {
+                    return start.getDate() <= 7;
+                  }
+                  if (selectedType === 'weeks') {
+                    return start.getDay() === 1;
+                  }
+                  if (selectedType === 'weekends') {
+                    return start.getDay() === 6 || start.getDay() === 0;
+                  }
+                  return true;
+                }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Saved Patterns</h2>
               <button
-                onClick={addTimeRange}
-                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                onClick={clearAllPatterns}
+                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
               >
-                Add Time Range
+                Delete All Patterns
               </button>
             </div>
-          </div>
-
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">Set Availability</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block mb-2">Select Time Range</label>
-                <select
-                  value={selectedTimeRange}
-                  onChange={(e) => setSelectedTimeRange(e.target.value)}
-                  className="w-full p-2 border rounded"
-                >
-                  {timeRanges.map(range => (
-                    <option key={range.id} value={range.id}>
-                      {range.splits.map(split => 
+            <div className="space-y-2">
+              {patterns.map((pattern) => {
+                const timeRange = timeRanges.find(r => r.id === pattern.timeRangeId);
+                return (
+                  <div 
+                    key={pattern.id} 
+                    className="p-4 border rounded flex justify-between items-center"
+                    style={{ borderLeftColor: timeRange?.color, borderLeftWidth: '4px' }}
+                  >
+                    <div>
+                      <p>Time: {timeRange?.splits.map(split => 
                         `${split.startTime} - ${split.endTime}`
-                      ).join(', ')}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block mb-2">Selection Type</label>
-                <div className="flex gap-2">
-                  {selectionTypes.map(type => (
+                      ).join(', ')}</p>
+                      <p>Type: {pattern.type}</p>
+                      <p>Date Range: {new Date(pattern.start).toLocaleDateString()} - {new Date(pattern.end).toLocaleDateString()}</p>
+                    </div>
                     <button
-                      key={type.value}
-                      onClick={() => setSelectedType(type.value)}
-                      className={`flex-1 px-4 py-2 rounded transition-colors ${
-                        selectedType === type.value
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                      }`}
+                      onClick={() => removePattern(pattern.id)}
+                      className="p-2 text-red-500 hover:text-red-700"
                     >
-                      {type.label}
+                      Delete
                     </button>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
-
-        <div className="space-y-4">
-          <div className="flex justify-end gap-2">
-            <div className="text-sm text-gray-600">
-              Current Mode: {selectionTypes.find(t => t.value === selectedType)?.label}
-            </div>
-          </div>
-          <FullCalendar
-            plugins={[dayGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
-            selectable={true}
-            selectMirror={true}
-            dayMaxEvents={true}
-            weekends={true}
-            events={calendarEvents}
-            select={handleSelect}
-            eventClick={handleEventClick}
-            height="auto"
-            firstDay={1}
-            selectConstraint={{
-              start: '00:00',
-              end: '00:00',
-              daysOfWeek: [1, 2, 3, 4, 5, 6, 0]
-            }}
-            selectOverlap={false}
-            unselectAuto={false}
-            selectMinDistance={0}
-            selectLongPressDelay={0}
-            longPressDelay={0}
-            eventDisplay="block"
-            selectAllow={(selectInfo) => {
-              const start = new Date(selectInfo.start);
-              const end = new Date(selectInfo.end);
-              
-              if (selectedType === 'months') {
-                return start.getDate() <= 7;
-              }
-              if (selectedType === 'weeks') {
-                return start.getDay() === 1;
-              }
-              if (selectedType === 'weekends') {
-                return start.getDay() === 6 || start.getDay() === 0;
-              }
-              return true;
-            }}
-          />
-        </div>
-      </div>
-
-      <div>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Saved Patterns</h2>
-          <button
-            onClick={clearAllPatterns}
-            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-          >
-            Delete All Patterns
-          </button>
-        </div>
-        <div className="space-y-2">
-          {patterns.map((pattern) => {
-            const timeRange = timeRanges.find(r => r.id === pattern.timeRangeId);
-            return (
-              <div 
-                key={pattern.id} 
-                className="p-4 border rounded flex justify-between items-center"
-                style={{ borderLeftColor: timeRange?.color, borderLeftWidth: '4px' }}
-              >
-                <div>
-                  <p>Time: {timeRange?.splits.map(split => 
-                    `${split.startTime} - ${split.endTime}`
-                  ).join(', ')}</p>
-                  <p>Type: {pattern.type}</p>
-                  <p>Date Range: {new Date(pattern.start).toLocaleDateString()} - {new Date(pattern.end).toLocaleDateString()}</p>
-                </div>
-                <button
-                  onClick={() => removePattern(pattern.id)}
-                  className="p-2 text-red-500 hover:text-red-700"
-                >
-                  Delete
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      )}
     </main>
   );
 }
