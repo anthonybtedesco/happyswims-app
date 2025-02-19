@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { supabase } from '@/lib/supbase/client'
 import { colors, buttonVariants } from '@/lib/colors'
-
+import { adminSignUp } from '@/lib/auth'
 type ClientCreateModalProps = {
   isOpen: boolean
   onClose: () => void
@@ -30,25 +30,17 @@ export default function ClientCreateModal({ isOpen, onClose }: ClientCreateModal
     setSuccess(false)
 
     try {
+      const { data, error } = await adminSignUp(formData.email, Math.random().toString(36).slice(-8), 'client')
+      if (error) {
+        setError(error.message)
+        return
+      }
 
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: Math.random().toString(36).slice(-8),
-        options: {
-          data: {
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            role: 'client'
-          }
-        }
-      })
+      if (!data?.user) {
+        throw new Error('Failed to create user')
+      }
 
-      if (authError) throw authError
-      if (!authData.user) throw new Error('Failed to create user')
-
-      // Wait for auth user to be fully created
-      await new Promise(resolve => setTimeout(resolve, DELAY_MS))
+      console.log('Auth User:', data.user)
 
       // Create address record
       const { data: addressData, error: addressError } = await supabase
@@ -65,16 +57,22 @@ export default function ClientCreateModal({ isOpen, onClose }: ClientCreateModal
       if (addressError) throw addressError
 
       // Then create the client record
+      const clientData = {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        user_id: data.user.id,
+        home_address: addressData.id
+      }
+      console.log('Client Data:', clientData)
+
       const { error: clientError } = await supabase
         .from('client')
-        .insert([{
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          user_id: authData.user.id,
-          home_address: addressData.id
-        }])
+        .insert([clientData])
 
-      if (clientError) throw clientError
+      if (clientError) {
+        console.error('Client Error:', clientError)
+        throw clientError
+      }
 
       setSuccess(true)
       setFormData({

@@ -3,11 +3,14 @@
 import React, { useState } from 'react'
 import { supabase } from '@/lib/supbase/client'
 import { colors, buttonVariants } from '@/lib/colors'
+import { adminSignUp } from '@/lib/auth'
 
 type InstructorCreateModalProps = {
   isOpen: boolean
   onClose: () => void
 }
+
+const DELAY_MS = 1000 // 1 second delay
 
 export default function InstructorCreateModal({ isOpen, onClose }: InstructorCreateModalProps) {
   const [error, setError] = useState<string | null>(null)
@@ -28,21 +31,17 @@ export default function InstructorCreateModal({ isOpen, onClose }: InstructorCre
     setSuccess(false)
 
     try {
-      // First create the auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: Math.random().toString(36).slice(-8), // Generate random password
-        options: {
-          data: {
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            role: 'instructor'
-          }
-        }
-      })
+      const { data, error } = await adminSignUp(formData.email, Math.random().toString(36).slice(-8), 'instructor')
+      if (error) {
+        setError(error.message)
+        return
+      }
 
-      if (authError) throw authError
-      if (!authData.user) throw new Error('Failed to create user')
+      if (!data?.user) {
+        throw new Error('Failed to create user')
+      }
+
+      console.log('Auth User:', data.user)
 
       // Create address record
       const { data: addressData, error: addressError } = await supabase
@@ -59,16 +58,22 @@ export default function InstructorCreateModal({ isOpen, onClose }: InstructorCre
       if (addressError) throw addressError
 
       // Then create the instructor record
+      const instructorData = {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        user_id: data.user.id,
+        home_address: addressData.id
+      }
+      console.log('Instructor Data:', instructorData)
+
       const { error: instructorError } = await supabase
         .from('instructor')
-        .insert([{
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          user_id: authData.user.id,
-          home_address: addressData.id
-        }])
+        .insert([instructorData])
 
-      if (instructorError) throw instructorError
+      if (instructorError) {
+        console.error('Instructor Error:', instructorError)
+        throw instructorError
+      }
 
       setSuccess(true)
       setFormData({

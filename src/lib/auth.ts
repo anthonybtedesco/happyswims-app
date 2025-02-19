@@ -65,6 +65,9 @@ export async function signIn(emailOrProvider: string, password?: string) {
   return { data, error }
 }
 
+/**
+ * Regular user sign up function that redirects to the appropriate domain
+ */
 export async function signUp(email: string, password: string, role: UserRole) {
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -90,6 +93,24 @@ export async function signUp(email: string, password: string, role: UserRole) {
     
     window.location.href = redirectUrl
   }
+
+  return { data, error }
+}
+
+/**
+ * Admin function to create new users (clients or instructors)
+ * Does not redirect since it's used by admin to create accounts
+ */
+export async function adminSignUp(email: string, password: string, role: UserRole) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        role,
+      },
+    },
+  })
 
   return { data, error }
 }
