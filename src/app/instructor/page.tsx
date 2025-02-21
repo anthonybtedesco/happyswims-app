@@ -31,6 +31,126 @@ const COLORS = [
   '#96CEB4', '#FFEEAD', '#D4A5A5'
 ];
 
+const timeToBlocks = (time: string) => {
+  const [hours, minutes] = time.split(':').map(Number);
+  return (hours * 4) + Math.floor(minutes / 15);
+};
+
+const blocksToTime = (blocks: number) => {
+  const hours = Math.floor(blocks / 4);
+  const minutes = (blocks % 4) * 15;
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+};
+
+const TimeRangeSelector = ({ 
+  timeRange, 
+  onUpdate 
+}: { 
+  timeRange: TimeRange, 
+  onUpdate: (bits: string) => void 
+}) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragValue, setDragValue] = useState<'0' | '1'>('1');
+  const [bits, setBits] = useState(() => {
+    const initialBits = new Array(96).fill('0');
+    timeRange.splits.forEach(split => {
+      const startBlocks = timeToBlocks(split.startTime);
+      const endBlocks = timeToBlocks(split.endTime);
+      for (let i = startBlocks; i < endBlocks; i++) {
+        initialBits[i] = '1';
+      }
+    });
+    return initialBits;
+  });
+
+  const handleMouseDown = (index: number) => {
+    setIsDragging(true);
+    const newValue = bits[index] === '1' ? '0' : '1';
+    setDragValue(newValue as '0' | '1');
+    const newBits = [...bits];
+    newBits[index] = newValue;
+    setBits(newBits);
+    onUpdate(newBits.join(''));
+  };
+
+  const handleMouseEnter = (index: number) => {
+    if (isDragging) {
+      const newBits = [...bits];
+      newBits[index] = dragValue;
+      setBits(newBits);
+      onUpdate(newBits.join(''));
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  useEffect(() => {
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => window.removeEventListener('mouseup', handleMouseUp);
+  }, []);
+
+  // Group bits into 6-hour chunks (24 blocks each)
+  const timeChunks = Array.from({ length: 4 }, (_, i) => i * 24);
+
+  return (
+    <div className="space-y-2">
+      {timeChunks.map(startBlock => (
+        <div key={startBlock} className="flex items-start gap-1">
+          <span className="text-xs text-gray-500 w-8 mt-1.5">
+            {Math.floor(startBlock / 4).toString().padStart(2, '0')}:00
+          </span>
+          <div className="flex flex-col gap-1">
+            {/* Row of dots */}
+            <div className="flex items-center gap-1">
+              {bits.slice(startBlock, startBlock + 24).map((bit, index) => {
+                const actualIndex = startBlock + index;
+                const hour = Math.floor(actualIndex / 4);
+                const minute = (actualIndex % 4) * 15;
+                const timeLabel = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                
+                return (
+                  <div 
+                    key={actualIndex} 
+                    className="w-3"
+                    onMouseDown={() => handleMouseDown(actualIndex)}
+                    onMouseEnter={() => handleMouseEnter(actualIndex)}
+                  >
+                    <div
+                      className={`w-3 h-3 rounded-full ${bit === '1' ? 'bg-blue-500' : 'bg-gray-200'} 
+                        transition-all duration-200 hover:scale-110 cursor-pointer`}
+                      title={timeLabel}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Row of numbers */}
+            <div className="flex items-center gap-1">
+              {bits.slice(startBlock, startBlock + 24).map((_, index) => {
+                const actualIndex = startBlock + index;
+                const hour = Math.floor(actualIndex / 4);
+                
+                return (
+                  <div key={actualIndex} className="w-3">
+                    {index % 4 === 0 && (
+                      <span className="text-xs text-gray-500">
+                        {hour.toString().padStart(2, '0')}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export default function InstructorDashboard() {
   const [timeRanges, setTimeRanges] = useState<TimeRange[]>([{
     id: '1',
@@ -43,7 +163,7 @@ export default function InstructorDashboard() {
   }]);
   const [patterns, setPatterns] = useState<AvailabilityPattern[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTimeRange, setSelectedTimeRange] = useState<string>('1');
+  const [selectedTimeRange, setSelectedTimeRange] = useState<string>(() => timeRanges[0].id);
   const [selectedType, setSelectedType] = useState<'days' | 'weeks' | 'months' | 'weekends'>('days');
   const [instructor, setInstructor] = useState<any | null>(null);
 
@@ -69,6 +189,12 @@ export default function InstructorDashboard() {
     fetchInstructor();
     loadAvailability();
   }, []);
+
+  useEffect(() => {
+    if (timeRanges.length > 0 && !timeRanges.some(tr => tr.id === selectedTimeRange)) {
+      setSelectedTimeRange(timeRanges[0].id);
+    }
+  }, [timeRanges, selectedTimeRange]);
 
   const loadAvailability = async () => {
     try {
@@ -181,17 +307,6 @@ export default function InstructorDashboard() {
     }
   };
 
-  const timeToBlocks = (time: string) => {
-    const [hours, minutes] = time.split(':').map(Number);
-    return (hours * 4) + Math.floor(minutes / 15);
-  };
-
-  const blocksToTime = (blocks: number) => {
-    const hours = Math.floor(blocks / 4);
-    const minutes = (blocks % 4) * 15;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-  };
-
   const addTimeRange = () => {
     const newTimeRange = {
       id: uuidv4(),
@@ -203,52 +318,6 @@ export default function InstructorDashboard() {
       color: COLORS[timeRanges.length % COLORS.length]
     };
     setTimeRanges([...timeRanges, newTimeRange]);
-  };
-
-  const addTimeSplit = (rangeId: string) => {
-    setTimeRanges(timeRanges.map(range => 
-      range.id === rangeId 
-        ? {
-            ...range,
-            splits: [...range.splits, {
-              id: uuidv4(),
-              startTime: '09:00',
-              endTime: '17:00'
-            }]
-          }
-        : range
-    ));
-  };
-
-  const updateTimeSplit = (
-    rangeId: string, 
-    splitId: string, 
-    field: 'startTime' | 'endTime', 
-    value: string
-  ) => {
-    setTimeRanges(timeRanges.map(range => 
-      range.id === rangeId 
-        ? {
-            ...range,
-            splits: range.splits.map(split =>
-              split.id === splitId 
-                ? { ...split, [field]: value }
-                : split
-            )
-          }
-        : range
-    ));
-  };
-
-  const removeTimeSplit = (rangeId: string, splitId: string) => {
-    setTimeRanges(timeRanges.map(range => 
-      range.id === rangeId 
-        ? {
-            ...range,
-            splits: range.splits.filter(split => split.id !== splitId)
-          }
-        : range
-    ));
   };
 
   const removeTimeRange = (id: string) => {
@@ -300,60 +369,69 @@ export default function InstructorDashboard() {
   };
 
   const hasOverlap = (start: Date, end: Date) => {
-    console.log('Checking for overlapping patterns between:', start, 'and', end);
     const overlappingPatterns = patterns.filter(pattern => {
       const patternStart = new Date(pattern.start);
       const patternEnd = new Date(pattern.end);
-      console.log('Checking pattern:', pattern.id);
-      console.log('Pattern start:', patternStart);
-      console.log('Pattern end:', patternEnd);
-      const hasOverlap = (
+      return (
         (start <= patternEnd && start >= patternStart) ||
         (end <= patternEnd && end >= patternStart) ||
         (start <= patternStart && end >= patternEnd)
       );
-      console.log('Has overlap:', hasOverlap);
-      return hasOverlap;
     });
 
-    console.log('Found overlapping patterns:', overlappingPatterns.length);
     if (overlappingPatterns.length === 0) return false;
 
-    const allContained = overlappingPatterns.every(pattern => {
+    // Split overlapping patterns
+    overlappingPatterns.forEach(pattern => {
       const patternStart = new Date(pattern.start);
-      console.log('Checking if pattern is contained:', pattern.id);
-      console.log('Pattern start:', patternStart);
-      const isContained = start <= patternStart && end >= patternStart;
-      console.log('Is contained:', isContained);
-      return isContained;
+      const patternEnd = new Date(pattern.end);
+
+      // Remove the original pattern
+      setPatterns(prev => prev.filter(p => p.id !== pattern.id));
+
+      // Create before pattern if needed
+      if (start > patternStart) {
+        const beforePattern: AvailabilityPattern = {
+          id: uuidv4(),
+          timeRangeId: pattern.timeRangeId,
+          start: patternStart.toISOString(),
+          end: new Date(start.getTime() - 1).toISOString(),
+          type: pattern.type
+        };
+        setPatterns(prev => [...prev, beforePattern]);
+      }
+
+      // Create after pattern if needed
+      if (end < patternEnd) {
+        const afterPattern: AvailabilityPattern = {
+          id: uuidv4(),
+          timeRangeId: pattern.timeRangeId,
+          start: new Date(end.getTime() + 1).toISOString(),
+          end: patternEnd.toISOString(),
+          type: pattern.type
+        };
+        setPatterns(prev => [...prev, afterPattern]);
+      }
     });
 
-    console.log('All patterns contained:', allContained);
-    if (allContained) {
-      console.log('Removing contained patterns');
-      setPatterns(patterns.filter(pattern => 
-        !overlappingPatterns.some(op => op.id === pattern.id)
-      ));
-      return false;
-    }
-
-    return true;
+    return false;
   };
 
   const handleSelect = (selectInfo: DateSelectArg) => {
     const timeRange = timeRanges.find(r => r.id === selectedTimeRange);
-    if (!timeRange) return;
-
-    const { startDate, endDate } = computeSelectionDates(selectInfo);
-
-    if (hasOverlap(startDate, endDate)) {
-      alert('This time period overlaps with existing availability. Please select a different period.');
+    if (!timeRange || timeRange.splits.length === 0) {
+      alert('Please select a valid time range first');
       selectInfo.view.calendar.unselect();
       return;
     }
 
+    const { startDate, endDate } = computeSelectionDates(selectInfo);
 
-    console.log('Adding new pattern:', { startDate, endDate, selectedType });
+    // Check for overlap and handle splitting
+    if (hasOverlap(startDate, endDate)) {
+      selectInfo.view.calendar.unselect();
+      return;
+    }
 
     const newPattern: AvailabilityPattern = {
       id: uuidv4(),
@@ -363,7 +441,7 @@ export default function InstructorDashboard() {
       type: selectedType
     };
 
-    setPatterns([...patterns, newPattern]);
+    setPatterns(prev => [...prev, newPattern]);
     selectInfo.view.calendar.unselect();
   };
 
@@ -476,40 +554,16 @@ export default function InstructorDashboard() {
                         className="w-full h-2 rounded-full mb-4" 
                         style={{ backgroundColor: range.color }}
                       />
-                      {range.splits.map(split => (
-                        <div key={split.id} className="flex items-center gap-4">
-                          <input
-                            type="time"
-                            value={split.startTime}
-                            onChange={(e) => updateTimeSplit(range.id, split.id, 'startTime', e.target.value)}
-                            className="p-2 border rounded"
-                            style={{ backgroundColor: colors.common.white }}
-                          />
-                          <span>to</span>
-                          <input
-                            type="time"
-                            value={split.endTime}
-                            onChange={(e) => updateTimeSplit(range.id, split.id, 'endTime', e.target.value)}
-                            className="p-2 border rounded"
-                            style={{ backgroundColor: colors.common.white, colorScheme: 'dark' }}
-                          />
-                          {range.splits.length > 1 && (
-                            <button
-                              onClick={() => removeTimeSplit(range.id, split.id)}
-                              className="p-2 text-red-500 hover:text-red-700"
-                            >
-                              Remove Split
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                      <TimeRangeSelector
+                        timeRange={range}
+                        onUpdate={(newTimerange) => {
+                          const splits = decodeBytea(newTimerange);
+                          setTimeRanges(timeRanges.map(r =>
+                            r.id === range.id ? { ...r, splits } : r
+                          ));
+                        }}
+                      />
                       <div className="flex gap-4">
-                        <button
-                          onClick={() => addTimeSplit(range.id)}
-                          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                        >
-                          Add Split
-                        </button>
                         <button
                           onClick={() => removeTimeRange(range.id)}
                           className="text-red-500 hover:text-red-700 px-4 py-2"
@@ -631,10 +685,12 @@ export default function InstructorDashboard() {
             <div className="space-y-2">
               {patterns.map((pattern) => {
                 const timeRange = timeRanges.find(r => r.id === pattern.timeRangeId);
+                const timeBlocks = encodeSplitsToBytea(timeRange?.splits || []).split('');
+                
                 return (
                   <div 
                     key={pattern.id} 
-                    className="p-4 border rounded flex justify-between items-center"
+                    className="p-4 border rounded flex flex-col gap-4"
                     style={{ borderLeftColor: timeRange?.color, borderLeftWidth: '4px' }}
                   >
                     <div>
@@ -644,9 +700,39 @@ export default function InstructorDashboard() {
                       <p>Type: {pattern.type}</p>
                       <p>Date Range: {new Date(pattern.start).toLocaleDateString()} - {new Date(pattern.end).toLocaleDateString()}</p>
                     </div>
+                    <div className="flex flex-col gap-1">
+                      {/* Row of dots */}
+                      <div className="flex items-center gap-1">
+                        {Array.from({length: 96}).map((_, index) => {
+                          const isActive = timeBlocks[index] === '1';
+                          return (
+                            <div key={index} className="w-3">
+                              <div
+                                className={`w-3 h-3 rounded-full ${isActive ? 'bg-blue-500' : 'bg-gray-200'} 
+                                  transition-all duration-200 hover:scale-110`}
+                                title={`${Math.floor(index/4).toString().padStart(2, '0')}:${((index%4)*15).toString().padStart(2, '0')}`}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Row of numbers */}
+                      <div className="flex items-center gap-1">
+                        {Array.from({length: 96}).map((_, index) => (
+                          <div key={index} className="w-3">
+                            {index % 4 === 0 && (
+                              <span className="text-xs text-gray-500">
+                                {Math.floor(index/4).toString().padStart(2, '0')}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                     <button
                       onClick={() => removePattern(pattern.id)}
-                      className="p-2 text-red-500 hover:text-red-700"
+                      className="self-end p-2 text-red-500 hover:text-red-700"
                     >
                       Delete
                     </button>
