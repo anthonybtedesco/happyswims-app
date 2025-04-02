@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { supabase } from '@/lib/supbase/client'
+import { supabase } from '@/lib/supabase/client'
 import { colors, buttonVariants } from '@/lib/colors'
 import { adminSignUp } from '@/lib/auth'
 type ClientCreateModalProps = {
@@ -30,7 +30,7 @@ export default function ClientCreateModal({ isOpen, onClose }: ClientCreateModal
     setSuccess(false)
 
     try {
-      const { data, error } = await adminSignUp(formData.email, Math.random().toString(36).slice(-8), 'client')
+      const { data, error } = await adminSignUp(formData.email, 'client')
       if (error) {
         setError(error.message)
         return

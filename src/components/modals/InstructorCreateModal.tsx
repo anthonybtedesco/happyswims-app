@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { supabase } from '@/lib/supbase/client'
+import { supabase } from '@/lib/supabase/client'
 import { colors, buttonVariants } from '@/lib/colors'
 import { adminSignUp } from '@/lib/auth'
 
@@ -10,7 +10,6 @@ type InstructorCreateModalProps = {
   onClose: () => void
 }
 
-const DELAY_MS = 1000 // 1 second delay
 
 export default function InstructorCreateModal({ isOpen, onClose }: InstructorCreateModalProps) {
   const [error, setError] = useState<string | null>(null)
@@ -31,7 +30,7 @@ export default function InstructorCreateModal({ isOpen, onClose }: InstructorCre
     setSuccess(false)
 
     try {
-      const { data, error } = await adminSignUp(formData.email, Math.random().toString(36).slice(-8), 'instructor')
+      const { data, error } = await adminSignUp(formData.email, 'instructor')
       if (error) {
         setError(error.message)
         return

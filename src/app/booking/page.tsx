@@ -1,6 +1,6 @@
 'use client'
 import React, { useState } from 'react'
-import { supabase } from '@/lib/supbase/client'
+import { supabase } from '@/lib/supabase/client'
 import { redirect } from 'next/navigation'
 import OnboardingForm from '@/components/forms/OnboardingForm'
 import { colors, buttonVariants } from '@/lib/colors'

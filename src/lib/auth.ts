@@ -1,4 +1,4 @@
-import { supabase } from "./supbase/client"
+import { supabase } from "./supabase/client"
 import { SendMailClient } from "zeptomail"
 
 export type UserRole = 'instructor' | 'client'
@@ -24,6 +24,13 @@ export async function signIn(emailOrProvider: string, password?: string) {
     await supabase.auth.getSession()
 
     if (data?.user) {
+      // Check if password needs to be changed
+      if (data.user.user_metadata.passwordNeedsChange) {
+        window.location.href = '/reset-password'
+        return { data, error }
+      }
+
+      // Regular role-based redirect
       const role = data.user.user_metadata.role
       let redirectUrl = '/'
       
@@ -101,14 +108,14 @@ export async function signUp(email: string, password: string, role: UserRole) {
  * Admin function to create new users (clients or instructors)
  * Does not redirect since it's used by admin to create accounts
  */
-export async function adminSignUp(email: string, password: string, role: UserRole) {
-  const { data, error } = await supabase.auth.signUp({
+export async function adminSignUp(email: string, role: UserRole) {
+  const { data, error } = await supabase.auth.signInWithOtp({
     email,
-    password,
     options: {
       data: {
         role,
       },
+      emailRedirectTo: `${window.location.origin}/reset-password`,
     },
   })
 
