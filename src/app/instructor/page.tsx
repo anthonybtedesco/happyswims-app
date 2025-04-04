@@ -149,7 +149,6 @@ export default function InstructorDashboard() {
 
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(23, 59, 59, 999);
-
     return { startDate, endDate };
   };
 
@@ -197,7 +196,6 @@ export default function InstructorDashboard() {
   const handleSelect = (selectInfo: DateSelectArg) => {
     const timeRange = timeRanges.find(r => r.id === selectedTimeRange);
     if (!timeRange) return;
-
     const { startDate, endDate } = computeSelectionDates(selectInfo);
 
     if (hasOverlap(startDate, endDate)) {
@@ -450,7 +448,7 @@ export default function InstructorDashboard() {
                 return start.getDate() <= 7;
               }
               if (selectedType === 'weeks') {
-                return start.getDay() === 1;
+                return start.getDay() >= 1 && start.getDay() <= 5;
               }
               if (selectedType === 'weekends') {
                 return start.getDay() === 6 || start.getDay() === 0;
