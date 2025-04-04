@@ -1,4 +1,5 @@
-import { supabase } from "./supbase/client"
+import { supabase } from "./supabase/client"
+import { SendMailClient } from "zeptomail"
 
 export type UserRole = 'instructor' | 'client'
 
@@ -23,6 +24,13 @@ export async function signIn(emailOrProvider: string, password?: string) {
     await supabase.auth.getSession()
 
     if (data?.user) {
+      // Check if password needs to be changed
+      if (data.user.user_metadata.passwordNeedsChange) {
+        window.location.href = '/reset-password'
+        return { data, error }
+      }
+
+      // Regular role-based redirect
       const role = data.user.user_metadata.role
       let redirectUrl = '/'
       
@@ -64,6 +72,9 @@ export async function signIn(emailOrProvider: string, password?: string) {
   return { data, error }
 }
 
+/**
+ * Regular user sign up function that redirects to the appropriate domain
+ */
 export async function signUp(email: string, password: string, role: UserRole) {
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -93,6 +104,24 @@ export async function signUp(email: string, password: string, role: UserRole) {
   return { data, error }
 }
 
+/**
+ * Admin function to create new users (clients or instructors)
+ * Does not redirect since it's used by admin to create accounts
+ */
+export async function adminSignUp(email: string, role: UserRole) {
+  const { data, error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      data: {
+        role,
+      },
+      emailRedirectTo: `${window.location.origin}/reset-password`,
+    },
+  })
+
+  return { data, error }
+}
+
 export async function signOut() {
   const { error } = await supabase.auth.signOut()
   return { error }
@@ -101,6 +130,35 @@ export async function signOut() {
 export async function getSession() {
   const { data: { session }, error } = await supabase.auth.getSession()
   return { session, error }
+}
+export async function sendEmail(to: string, subject: string, htmlBody: string) {
+  const url = "api.zeptomail.com/"
+  const token = "Zoho-enczapikey wSsVR60g+0T4B/x8zTWpI+wwyFVRBl/0HUR52wCo6SL9FvGX8sdvlxKcV1WgSaMXEDNqRe1U4J3x17qnvhDzMWm9ZlxONJIoPxQ9qnGRgF88n+g=="
+
+  const client = new SendMailClient({url, token})
+
+  try {
+    const response = await client.sendMail({
+      from: {
+        address: "noreply@agfarms.dev",
+        name: "noreply"
+      },
+      to: [
+        {
+          email_address: {
+            address: to,
+            name: to.split('@')[0]
+          }
+        }
+      ],
+      subject,
+      htmlbody: htmlBody
+    })
+    
+    return { data: response, error: null }
+  } catch (error) {
+    return { data: null, error }
+  }
 }
 
 // Remove or comment out the separate signInWithGoogle function since it's no longer needed

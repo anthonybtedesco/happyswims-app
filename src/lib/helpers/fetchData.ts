@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supbase/client'
+import { supabase } from '@/lib/supabase/client'
 import type { 
   Booking, 
   Client, 

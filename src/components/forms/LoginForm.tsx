@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supbase/client'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
 export default function LoginForm() {
@@ -104,15 +104,13 @@ export default function LoginForm() {
               fontSize: "0.875rem",
               fontWeight: "500",
               color: "#374151",
-              marginBottom: "0.25rem",
-              backgroundColor: "white"
+              marginBottom: "0.25rem"
             }}>
               Email
             </label>
             <input
               id="email"
               type="email"
-              placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               style={{
@@ -121,8 +119,7 @@ export default function LoginForm() {
                 padding: "0.5rem 0.75rem",
                 borderRadius: "0.375rem",
                 border: "1px solid #d1d5db",
-                marginTop: "0.25rem",
-                backgroundColor: "white"
+                marginTop: "0.25rem"
               }}
               required
             />
@@ -134,15 +131,13 @@ export default function LoginForm() {
               fontSize: "0.875rem",
               fontWeight: "500",
               color: "#374151",
-              marginBottom: "0.25rem",
-              backgroundColor: "white"
+              marginBottom: "0.25rem"
             }}>
               Password
             </label>
             <input
               id="password"
               type="password"
-              placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{
@@ -151,8 +146,7 @@ export default function LoginForm() {
                 padding: "0.5rem 0.75rem",
                 borderRadius: "0.375rem",
                 border: "1px solid #d1d5db",
-                marginTop: "0.25rem",
-                backgroundColor: "white"
+                marginTop: "0.25rem"
               }}
               required
             />

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { signUp, UserRole } from '@/lib/auth'
-import { createClient } from '@/lib/supbase/client'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
 export default function SignUpForm() {

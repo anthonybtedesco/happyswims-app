@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supbase/client'
+import { supabase } from '@/lib/supabase/client'
 import Calendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -11,6 +11,8 @@ import { colors, buttonVariants } from '@/lib/colors'
 import BookingCreateModal from '@/components/modals/BookingCreateModal'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import ClientCreateModal from '@/components/modals/ClientCreateModal'
+import InstructorCreateModal from '@/components/modals/InstructorCreateModal'
 
 type Instructor = {
   id: string
@@ -35,6 +37,8 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([])
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
   const [showBookingModal, setShowBookingModal] = useState(false)
+  const [showClientModal, setShowClientModal] = useState(false)
+  const [showInstructorModal, setShowInstructorModal] = useState(false)
   const [instructors, setInstructors] = useState<Instructor[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [addresses, setAddresses] = useState<Address[]>([])
@@ -149,7 +153,7 @@ export default function AdminDashboard() {
   return (
     <main style={{ padding: '2rem' }}>
       <div style={{ display: 'flex', gap: '2rem' }}>
-        <div style={{ width: '250px' }}>
+        <div style={{ width: '250px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <h2>Users</h2>
           <div style={{ marginTop: '1rem' }}>
 
@@ -170,6 +174,8 @@ export default function AdminDashboard() {
             </Select> 
           </div>
           <Button onClick={() => setShowBookingModal(true)}>New Booking</Button>
+          <Button onClick={() => setShowClientModal(true)}>New Client</Button>
+          <Button onClick={() => setShowInstructorModal(true)}>New Instructor</Button>
 
         </div>
 
@@ -198,6 +204,16 @@ export default function AdminDashboard() {
         instructors={instructors}
         clients={clients}
         addresses={addresses}
+      />
+
+      <ClientCreateModal
+        isOpen={showClientModal}
+        onClose={() => setShowClientModal(false)}
+      />
+
+      <InstructorCreateModal
+        isOpen={showInstructorModal}
+        onClose={() => setShowInstructorModal(false)}
       />
     </main>
   )
