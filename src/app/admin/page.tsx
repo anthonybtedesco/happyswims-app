@@ -77,7 +77,7 @@ export default function AdminDashboard() {
     return () => {
       bookingSubscription.unsubscribe()
     }
-    
+
   }, [])
 
   const fetchData = async () => {
@@ -94,7 +94,7 @@ export default function AdminDashboard() {
     console.log("instructorData.data", instructorData.data)
     console.log("clientData.data", clientData.data)
     console.log("addressData.data", addressData.data)
-    
+
     if (userData.data) setUsers(userData.data)
     if (instructorData.data) setInstructors(instructorData.data)
     if (clientData.data) setClients(clientData.data)
@@ -140,7 +140,7 @@ export default function AdminDashboard() {
         recurrence_weeks: 0,
         status: 'scheduled'
       })
-      
+
       setTimeout(() => {
         setShowBookingModal(false)
         setSuccess(false)
@@ -171,7 +171,7 @@ export default function AdminDashboard() {
                   </SelectItem>
                 ))}
               </SelectContent>
-            </Select> 
+            </Select>
           </div>
           <Button onClick={() => setShowBookingModal(true)}>New Booking</Button>
           <Button onClick={() => setShowClientModal(true)}>New Client</Button>
