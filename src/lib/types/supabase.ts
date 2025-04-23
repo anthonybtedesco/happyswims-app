@@ -57,7 +57,8 @@ export type Database = {
         Row: {
           id: string
           created_at: string
-          
+          latitude: number
+          longitude: number 
           address_line: string
           city: string
           state: string
