@@ -1,0 +1,82 @@
+# Mapbox Search JS Dependencies
+
+To add Mapbox Address Autofill functionality, you need to install the following packages:
+
+```bash
+npm install @mapbox/search-js-react
+```
+
+Or if you're using yarn:
+
+```bash
+yarn add @mapbox/search-js-react
+```
+
+## Environment Variables
+
+You need to add your Mapbox access token to your environment variables. Create or update your `.env.local` file with:
+
+```
+NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_token_here
+```
+
+Replace `your_mapbox_token_here` with your actual Mapbox access token.
+
+### Creating a Mapbox Token
+
+If you don't have a Mapbox token yet:
+
+1. Go to [Mapbox](https://account.mapbox.com/auth/signup/) and create an account
+2. Navigate to your account dashboard
+3. Create a new token with the following scopes:
+   - Geocoding (for address autofill)
+   - Static Images (for map display)
+4. Copy the token and add it to your `.env.local` file
+
+### Troubleshooting Token Issues
+
+If you see "401 Unauthorized" errors:
+
+1. Verify your token is correct
+2. Make sure the token has the required scopes
+3. Check that the environment variable is being loaded correctly
+4. Restart your development server after updating the `.env.local` file
+
+## Next.js Configuration
+
+If you're using Next.js, you may need to update your `next.config.js` to add the Mapbox domain to the list of allowed domains for images:
+
+```js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  images: {
+    domains: ['api.mapbox.com'],
+  },
+};
+
+module.exports = nextConfig;
+```
+
+## Additional Styles
+
+You might need to add some additional styles for the Mapbox components. Create or update your `styles/mapbox.css` file with:
+
+```css
+.mapboxgl-ctrl-geocoder {
+  width: 100% !important;
+  max-width: 100% !important;
+  font-size: 15px !important;
+  line-height: 20px !important;
+  color: #404040;
+}
+
+.mapboxgl-ctrl-geocoder--input {
+  padding: 6px 35px 6px 10px !important;
+  height: 40px !important;
+}
+
+.mapboxgl-ctrl-geocoder--icon {
+  top: 8px !important;
+}
+``` 

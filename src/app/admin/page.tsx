@@ -16,6 +16,8 @@ import InstructorCreateModal from '@/components/modals/InstructorCreateModal'
 
 type Instructor = {
   id: string
+  first_name: string
+  last_name: string
 }
 
 type Client = {
@@ -31,6 +33,8 @@ type Address = {
   city: string
   state: string
   zip: string
+  latitude: number
+  longitude: number
 }
 
 export default function AdminDashboard() {

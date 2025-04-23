@@ -57,6 +57,7 @@ export type Database = {
         Row: {
           id: string
           created_at: string
+          coordinates: JSON
           address_line: string
           city: string
           state: string
@@ -71,6 +72,26 @@ export type Database = {
           zip: string
         }
       }
+      availability: {
+        Row: {
+          id: string
+          created_at: string
+          instructor_id: string
+          start_date: Date
+          end_date: Date
+          time_range: string
+          color: string
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          instructor_id: string
+          start_date: Date
+          end_date: Date
+          time_range: string
+          color: string
+        }
+      }
     }
   }
 }
@@ -81,6 +102,8 @@ export type Client = Database['public']['Tables']['client']['Row']
 export type Instructor = Database['public']['Tables']['instructor']['Row']
 export type Address = Database['public']['Tables']['address']['Row']
 export type AddressInsert = Database['public']['Tables']['address']['Insert']
+export type Availability = Database['public']['Tables']['availability']['Row']
+export type AvailabilityInsert = Database['public']['Tables']['availability']['Insert']
 
 export type BookingWithRelations = Booking & {
   client: Pick<Client, 'first_name' | 'last_name'>

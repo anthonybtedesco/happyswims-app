@@ -4,7 +4,11 @@ import React, { useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { colors, buttonVariants } from '@/lib/colors'
 import { adminSignUp } from '@/lib/auth'
+import { geocodeNewAddress } from '@/lib/geocoding'
+import AddressAutofillInput from '@/components/AddressAutofillInput'
+import { MAPBOX_ACCESS_TOKEN } from '@/lib/mapbox/config'
 
+import AutofillAddress from '@/lib/mapbox/AutofillAddress'
 type InstructorCreateModalProps = {
   isOpen: boolean
   onClose: () => void
@@ -42,15 +46,31 @@ export default function InstructorCreateModal({ isOpen, onClose }: InstructorCre
 
       console.log('Auth User:', data.user)
 
-      // Create address record
+      // Get coordinates for the address
+      console.log('Geocoding address before creating record');
+      const coordinates = await geocodeNewAddress(
+        formData.address_line,
+        formData.city,
+        formData.state,
+        formData.zip
+      );
+      
+      console.log('Geocoding results:', coordinates);
+
+      // Create address record with coordinates if available
+      const addressInsertData = {
+        address_line: formData.address_line,
+        city: formData.city,
+        state: formData.state,
+        zip: formData.zip,
+        ...(coordinates && { coordinates })
+      };
+      
+      console.log('Creating address with data:', addressInsertData);
+
       const { data: addressData, error: addressError } = await supabase
         .from('address')
-        .insert([{
-          address_line: formData.address_line,
-          city: formData.city,
-          state: formData.state,
-          zip: formData.zip
-        }])
+        .insert([addressInsertData])
         .select()
         .single()
 
@@ -93,6 +113,19 @@ export default function InstructorCreateModal({ isOpen, onClose }: InstructorCre
       setError(err.message)
     }
   }
+
+  // Handle address change from AutofillAddress component
+  const handleAddressChange = (addressData: {
+    address_line: string;
+    city: string;
+    state: string;
+    zip: string;
+  }) => {
+    setFormData(prevData => ({
+      ...prevData,
+      ...addressData
+    }));
+  };
 
   if (!isOpen) return null
 
@@ -206,81 +239,19 @@ export default function InstructorCreateModal({ isOpen, onClose }: InstructorCre
 
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.text.secondary }}>
-                Street Address
+                Address
               </label>
-              <input
-                type="text"
-                value={formData.address_line}
-                onChange={(e) => setFormData({ ...formData, address_line: e.target.value })}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '6px',
-                  border: `1px solid ${colors.border.light}`,
-                  backgroundColor: colors.common.white
+              <AutofillAddress 
+                initialData={{
+                  address_line: formData.address_line,
+                  city: formData.city,
+                  state: formData.state,
+                  zip: formData.zip
                 }}
+                onChange={handleAddressChange}
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.text.secondary }}>
-                  City
-                </label>
-                <input
-                  type="text"
-                  value={formData.city}
-                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '6px',
-                    border: `1px solid ${colors.border.light}`,
-                    backgroundColor: colors.common.white
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.text.secondary }}>
-                  State
-                </label>
-                <input
-                  type="text"
-                  value={formData.state}
-                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '6px',
-                    border: `1px solid ${colors.border.light}`,
-                    backgroundColor: colors.common.white
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.text.secondary }}>
-                  ZIP Code
-                </label>
-                <input
-                  type="text"
-                  value={formData.zip}
-                  onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '6px',
-                    border: `1px solid ${colors.border.light}`,
-                    backgroundColor: colors.common.white
-                  }}
-                />
-              </div>
-            </div>
           </div>
 
           {error && (

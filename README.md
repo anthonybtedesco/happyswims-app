@@ -34,3 +34,17 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## MapBox Integration
+
+This project uses MapBox for displaying address locations on a map. To set up MapBox:
+
+1. Sign up for a free MapBox account at https://account.mapbox.com/auth/signup/
+2. Create an access token in your MapBox account dashboard
+3. Copy the token and add it to your `.env.local` file:
+
+```
+NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_token_here
+```
+
+4. Restart the development server for the changes to take effect
