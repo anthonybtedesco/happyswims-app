@@ -109,17 +109,26 @@ export async function signUp(email: string, password: string, role: UserRole) {
  * Does not redirect since it's used by admin to create accounts
  */
 export async function adminSignUp(email: string, role: UserRole) {
-  const { data, error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      data: {
-        role,
+  try {
+    const response = await fetch('/api/auth/admin-signup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      emailRedirectTo: `${window.location.origin}/reset-password`,
-    },
-  })
+      body: JSON.stringify({ email, role }),
+    });
 
-  return { data, error }
+    const result = await response.json();
+
+    if (!response.ok) {
+      return { data: null, error: new Error(result.error) };
+    }
+
+    return { data: result, error: null };
+  } catch (error: any) {
+    console.error('Admin signup error:', error);
+    return { data: null, error };
+  }
 }
 
 export async function signOut() {

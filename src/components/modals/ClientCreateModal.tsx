@@ -40,6 +40,12 @@ export default function ClientCreateModal({ isOpen, onClose }: ClientCreateModal
         throw new Error('Failed to create user')
       }
 
+      // Get user ID safely from the response
+      const userId = data.user.id
+      if (!userId) {
+        throw new Error('User ID not found in response')
+      }
+
       console.log('Auth User:', data.user)
 
       // Create address record
@@ -60,7 +66,7 @@ export default function ClientCreateModal({ isOpen, onClose }: ClientCreateModal
       const clientData = {
         first_name: formData.first_name,
         last_name: formData.last_name,
-        user_id: data.user.id,
+        user_id: userId,
         home_address: addressData.id
       }
       console.log('Client Data:', clientData)
@@ -88,7 +94,7 @@ export default function ClientCreateModal({ isOpen, onClose }: ClientCreateModal
       setTimeout(() => {
         onClose()
         setSuccess(false)
-      }, 2000)
+      }, 500)
     } catch (err: any) {
       setError(err.message)
     }
