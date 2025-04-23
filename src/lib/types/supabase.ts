@@ -67,6 +67,8 @@ export type Database = {
         Insert: {
           id?: string
           created_at?: string
+          latitude?: number
+          longitude?: number
           address_line: string
           city: string
           state: string
