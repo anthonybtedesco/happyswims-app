@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase/client'
 import { colors, buttonVariants } from '@/lib/colors'
 import { adminSignUp } from '@/lib/auth'
 import { geocodeNewAddress } from '@/lib/geocoding'
-import AddressAutofillInput from '@/components/AddressAutofillInput'
 import { MAPBOX_ACCESS_TOKEN } from '@/lib/mapbox/config'
 
 import AutofillAddress from '@/lib/mapbox/AutofillAddress'
