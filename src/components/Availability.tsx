@@ -136,7 +136,7 @@ export default function InstructorDashboard() {
           
           if (!timeRangeMap.has(timeRangeId)) {
             // Parse timerange string into splits
-            const splits = (item.timerange || '').split(',').map(timeStr => {
+            const splits = (item.timerange || '').split(',').map((timeStr: string) => {
               const [startTime, endTime] = timeStr.split('-');
               return {
                 id: uuidv4(),

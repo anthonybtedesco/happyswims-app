@@ -36,13 +36,10 @@ export default function SignUpForm() {
         throw error
       }
       
-      if (data?.url) {
-        // Redirect the user to the OAuth provider
-        console.log('Redirecting to:', data.url)
-        window.location.href = data.url
-      } else {
-        console.error('No redirect URL received from Supabase')
-        setError('Failed to start Google authentication process')
+      const currentUrl = window.location.href;
+      if (currentUrl !== data.url) {
+        console.log('Redirecting to:', data.url);
+        window.location.href = data.url;
       }
     } catch (error: any) {
       console.error('Error in Google sign up:', error)
