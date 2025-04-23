@@ -57,7 +57,7 @@ export type Database = {
         Row: {
           id: string
           created_at: string
-          coordinates: JSON
+          
           address_line: string
           city: string
           state: string
