@@ -77,7 +77,10 @@ export default function ClientCreateModal({ isOpen, onClose }: ClientCreateModal
         city: formData.city,
         state: formData.state,
         zip: formData.zip,
-        ...(coordinates && { coordinates })
+        ...(coordinates && { 
+          latitude: coordinates[1],  // Latitude is the second element in the tuple
+          longitude: coordinates[0]  // Longitude is the first element in the tuple
+        })
       };
       
       console.log('Creating address with data:', addressInsertData);

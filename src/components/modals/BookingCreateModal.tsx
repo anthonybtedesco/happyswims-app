@@ -380,7 +380,10 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
       // Create address record with coordinates if available
       const addressInsertData = {
         ...addressData,
-        ...(coordinates && { coordinates })
+        ...(coordinates && { 
+          latitude: coordinates[1],  // Latitude is the second element in the tuple
+          longitude: coordinates[0]  // Longitude is the first element in the tuple
+        })
       };
       
       console.log("Inserting address into database with data:", addressInsertData);

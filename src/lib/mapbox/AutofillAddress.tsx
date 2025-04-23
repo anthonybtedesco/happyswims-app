@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { AddressAutofill } from "@mapbox/search-js-react";
 
 interface AutofillAddressProps {
   initialData?: {
@@ -18,6 +19,7 @@ interface AutofillAddressProps {
 }
 
 export default function AutofillAddress({ initialData, onChange }: AutofillAddressProps) {
+  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
   const [formData, setFormData] = useState({
     address_line: initialData?.address_line || '',
     city: initialData?.city || '',
@@ -102,6 +104,73 @@ export default function AutofillAddress({ initialData, onChange }: AutofillAddre
       [fieldMap[name] || name]: value
     }));
   };
+  
+  // Handle when the user selects an address from the autofill dropdown
+  const handleRetrieve = (res: any) => {
+    if (!res || !res.features || res.features.length === 0) return;
+
+    const feature = res.features[0];
+    if (!feature || !feature.properties) return;
+    
+    try {
+      // Get address components
+      const props = feature.properties;
+      
+      // Get address line
+      const addressLine = props.address || '';
+      
+      // Get city, state and zip from context array if available
+      let city = '';
+      let state = '';
+      let zip = '';
+      
+      if (props.context && Array.isArray(props.context)) {
+        props.context.forEach((item: any) => {
+          if (item.id && item.id.startsWith('place')) {
+            city = item.text || '';
+          } else if (item.id && item.id.startsWith('region')) {
+            state = item.text || '';
+          } else if (item.id && item.id.startsWith('postcode')) {
+            zip = item.text || '';
+          }
+        });
+      } else {
+        // Fallback to direct properties
+        city = props.place_name || props.place || '';
+        state = props.region || '';
+        zip = props.postcode || '';
+      }
+      
+      // Get coordinates
+      const coordinates = feature.geometry?.coordinates;
+      let latitude: number | undefined = undefined;
+      let longitude: number | undefined = undefined;
+      
+      if (coordinates && coordinates.length >= 2) {
+        // Mapbox returns coordinates as [longitude, latitude]
+        longitude = coordinates[0];
+        latitude = coordinates[1];
+      }
+      
+      // Mark this as an internal update
+      isInternalUpdate.current = true;
+      
+      // Update the form with the address data and coordinates
+      setFormData(prev => ({
+        ...prev,
+        address_line: addressLine,
+        city,
+        state,
+        zip,
+        ...(latitude !== undefined && { latitude }),
+        ...(longitude !== undefined && { longitude })
+      }));
+      
+      console.log(`Address selected from autofill with coordinates: lat=${latitude}, lng=${longitude}`);
+    } catch (error) {
+      console.error("Error processing address selection:", error);
+    }
+  };
 
   // Function to manually geocode an address
   const geocodeAddress = async () => {
@@ -155,92 +224,94 @@ export default function AutofillAddress({ initialData, onChange }: AutofillAddre
   }, [formData.address_line, formData.city, formData.state, formData.zip]);
 
   return (
-    <div>
-      <div style={{ marginBottom: '1rem' }}>
-        <input
-          name="address"
-          placeholder="Address"
-          type="text"
-          autoComplete="address-line1"
-          value={formData.address_line}
-          onChange={handleChange}
-          style={{
-            width: '100%',
-            padding: '0.75rem',
-            borderRadius: '6px',
-            border: '1px solid #e2e8f0',
-            backgroundColor: '#ffffff',
-            fontSize: '1rem',
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-            outline: 'none'
-          }}
-        />
+    <AddressAutofill accessToken={mapboxToken} onRetrieve={handleRetrieve}>
+      <div>
+        <div style={{ marginBottom: '1rem' }}>
+          <input
+            name="address"
+            placeholder="Address"
+            type="text"
+            autoComplete="address-line1"
+            value={formData.address_line}
+            onChange={handleChange}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: '#ffffff',
+              fontSize: '1rem',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+              outline: 'none'
+            }}
+          />
+        </div>
+        
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: '2fr 1fr', 
+          gap: '0.75rem',
+          marginBottom: '1rem'
+        }}>
+          <input
+            name="city"
+            placeholder="City"
+            type="text"
+            autoComplete="address-level2"
+            value={formData.city}
+            onChange={handleChange}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: '#ffffff',
+              fontSize: '1rem',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+              outline: 'none'
+            }}
+          />
+          <input
+            name="state"
+            placeholder="State"
+            type="text"
+            autoComplete="address-level1"
+            value={formData.state}
+            onChange={handleChange}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: '#ffffff',
+              fontSize: '1rem',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+              outline: 'none'
+            }}
+          />
+        </div>
+        
+        <div style={{ marginBottom: '1rem' }}>
+          <input
+            name="postcode"
+            placeholder="ZIP Code"
+            type="text"
+            autoComplete="postal-code"
+            value={formData.zip}
+            onChange={handleChange}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: '#ffffff',
+              fontSize: '1rem',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+              outline: 'none'
+            }}
+          />
+        </div>
       </div>
-      
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: '2fr 1fr', 
-        gap: '0.75rem',
-        marginBottom: '1rem'
-      }}>
-        <input
-          name="city"
-          placeholder="City"
-          type="text"
-          autoComplete="address-level2"
-          value={formData.city}
-          onChange={handleChange}
-          style={{
-            width: '100%',
-            padding: '0.75rem',
-            borderRadius: '6px',
-            border: '1px solid #e2e8f0',
-            backgroundColor: '#ffffff',
-            fontSize: '1rem',
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-            outline: 'none'
-          }}
-        />
-        <input
-          name="state"
-          placeholder="State"
-          type="text"
-          autoComplete="address-level1"
-          value={formData.state}
-          onChange={handleChange}
-          style={{
-            width: '100%',
-            padding: '0.75rem',
-            borderRadius: '6px',
-            border: '1px solid #e2e8f0',
-            backgroundColor: '#ffffff',
-            fontSize: '1rem',
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-            outline: 'none'
-          }}
-        />
-      </div>
-      
-      <div style={{ marginBottom: '1rem' }}>
-        <input
-          name="postcode"
-          placeholder="ZIP Code"
-          type="text"
-          autoComplete="postal-code"
-          value={formData.zip}
-          onChange={handleChange}
-          style={{
-            width: '100%',
-            padding: '0.75rem',
-            borderRadius: '6px',
-            border: '1px solid #e2e8f0',
-            backgroundColor: '#ffffff',
-            fontSize: '1rem',
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-            outline: 'none'
-          }}
-        />
-      </div>
-    </div>
+    </AddressAutofill>
   )
 }
