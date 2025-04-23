@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface AutofillAddressProps {
   initialData?: {
@@ -27,11 +27,58 @@ export default function AutofillAddress({ initialData, onChange }: AutofillAddre
     longitude: undefined as number | undefined
   });
   
-  // Update parent component when form data changes
+  // Use a ref to track if this is an internal update
+  const isInternalUpdate = useRef(false);
+  
+  // Track previous values to avoid unnecessary updates
+  const prevFormDataRef = useRef(formData);
+  
+  // Update internal state when initialData changes
   useEffect(() => {
-    if (onChange) {
+    if (initialData) {
+      // Only update if initialData actually changed
+      const needsUpdate = 
+        initialData.address_line !== formData.address_line ||
+        initialData.city !== formData.city ||
+        initialData.state !== formData.state ||
+        initialData.zip !== formData.zip;
+      
+      if (needsUpdate) {
+        // This is an external update, don't trigger onChange
+        isInternalUpdate.current = false;
+        
+        setFormData(prev => ({
+          ...prev,
+          address_line: initialData.address_line || prev.address_line,
+          city: initialData.city || prev.city,
+          state: initialData.state || prev.state,
+          zip: initialData.zip || prev.zip
+        }));
+      }
+    }
+  }, [initialData]);
+  
+  // Update parent component when form data changes - but only for internal updates
+  useEffect(() => {
+    // Don't trigger onChange on the first render or when initialData causes an update
+    const hasChanged = 
+      formData.address_line !== prevFormDataRef.current.address_line ||
+      formData.city !== prevFormDataRef.current.city ||
+      formData.state !== prevFormDataRef.current.state ||
+      formData.zip !== prevFormDataRef.current.zip ||
+      formData.latitude !== prevFormDataRef.current.latitude ||
+      formData.longitude !== prevFormDataRef.current.longitude;
+    
+    // Update the previous value reference
+    prevFormDataRef.current = formData;
+    
+    // Only call onChange if it's an internal update and the data actually changed
+    if (onChange && isInternalUpdate.current && hasChanged) {
       onChange(formData);
     }
+    
+    // Reset internal update flag
+    isInternalUpdate.current = false;
   }, [formData, onChange]);
 
   // Handle input changes for all fields
@@ -45,6 +92,9 @@ export default function AutofillAddress({ initialData, onChange }: AutofillAddre
       'state': 'state',
       'postcode': 'zip'
     };
+    
+    // Mark this as an internal update before changing state
+    isInternalUpdate.current = true;
     
     // Update the form data state
     setFormData(prev => ({
@@ -80,6 +130,9 @@ export default function AutofillAddress({ initialData, onChange }: AutofillAddre
       console.log('Geocoding result:', data);
       
       if (data.lat && data.lng) {
+        // Mark this as an internal update before changing state
+        isInternalUpdate.current = true;
+        
         setFormData(prev => ({
           ...prev,
           latitude: data.lat,
