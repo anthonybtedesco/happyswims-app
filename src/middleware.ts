@@ -49,10 +49,9 @@ export async function middleware(request: NextRequest) {
   const isAuthPage = request.nextUrl.pathname.match(/^\/(?:login|signup|reset-password)$/)
 
   if (!user) {
-    if (!isAuthPage) {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-    return response
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
   }
 
   if (isAuthPage) {
@@ -61,15 +60,15 @@ export async function middleware(request: NextRequest) {
     let redirectUrl = '/'
     
     if (userRole === 'admin') {
-      return NextResponse.redirect('http://admin.happyswims.life')
+      return NextResponse.redirect('https://admin.happyswims.life')
     }
     
     switch (userRole) {
       case 'instructor':
-        redirectUrl = 'http://instructor.happyswims.life'
+        redirectUrl = 'https://instructor.happyswims.life'
         break
       case 'client':
-        redirectUrl = 'http://book.happyswims.life'
+        redirectUrl = 'https://book.happyswims.life'
         break
     }
     
@@ -78,16 +77,16 @@ export async function middleware(request: NextRequest) {
 
   const userRole = user.user_metadata.role
 
-  if (subdomain === 'admin' && userRole !== 'admin') {
-    return NextResponse.redirect('http://book.happyswims.life')
+  if (subdomain === 'admin' && userRole !== 'admin' && request.url !== 'https://book.happyswims.life') {
+    return NextResponse.redirect('https://book.happyswims.life')
   }
 
-  if (subdomain === 'instructor' && userRole !== 'instructor') {
-    return NextResponse.redirect('http://book.happyswims.life')
+  if (subdomain === 'instructor' && userRole !== 'instructor' && request.url !== 'https://instructor.happyswims.life') {
+    return NextResponse.redirect('https://instructor.happyswims.life')
   }
 
-  if (subdomain === 'book' && userRole === 'client') {
-    return NextResponse.redirect('http://book.happyswims.life')
+  if (subdomain === 'book' && userRole === 'client' && request.url !== 'https://book.happyswims.life') {
+    return NextResponse.redirect('https://book.happyswims.life')
   }
 
   if (subdomain === 'admin') {
@@ -99,7 +98,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (subdomain === 'book') {
-    return NextResponse.rewrite(new URL('/booking' + request.nextUrl.pathname, request.url))
+    return NextResponse.rewrite(new URL('/book' + request.nextUrl.pathname, request.url))
   }
 
   return response

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Address, Instructor, Client } from '@/lib/types/supabase'
+import { Address, Instructor, Client, Availability, Booking } from '@/lib/types/supabase'
 import HomeTab from './tabs/HomeTab'
 import DataTab from './tabs/DataTab'
 
@@ -12,7 +12,8 @@ export default function AdminDashboard() {
   const [instructors, setInstructors] = useState<Instructor[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [addresses, setAddresses] = useState<Address[]>([])
-  const [bookings, setBookings] = useState<any[]>([])
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [availabilities, setAvailabilities] = useState<Availability[]>([])
 
   useEffect(() => {
     fetchData()
@@ -35,16 +36,17 @@ export default function AdminDashboard() {
     return () => {
       bookingSubscription.unsubscribe()
     }
-    
+
   }, [])
 
   const fetchData = async () => {
-    const [userData, instructorData, clientData, addressData, bookingData] = await Promise.all([
+    const [userData, instructorData, clientData, addressData, bookingData, availabilityData] = await Promise.all([
       supabase.from('client').select('*'),
       supabase.from('instructor').select('*'),
       supabase.from('client').select('*'),
       supabase.from('address').select('*'),
-      supabase.from('booking').select(`*`)
+      supabase.from('booking').select(`*`),
+      supabase.from('availability').select(`*`)
     ])
 
     console.log("bookingData.data", bookingData.data)
@@ -52,24 +54,13 @@ export default function AdminDashboard() {
     console.log("instructorData.data", instructorData.data)
     console.log("clientData.data", clientData.data)
     console.log("addressData.data", addressData.data)
-    
+    console.log("availabilityData.data", availabilityData.data)
     if (userData.data) setUsers(userData.data)
     if (instructorData.data) setInstructors(instructorData.data)
     if (clientData.data) setClients(clientData.data)
     if (addressData.data) setAddresses(addressData.data)
-    if (bookingData.data) {
-      const formattedBookings = bookingData.data.map(booking => ({
-        id: booking.id,
-        title: 'test',
-        start: booking.start_time,
-        end: booking.end_time,
-        client_id: booking.client_id,
-        instructor_id: booking.instructor_id,
-        status: booking.status
-      }))
-      console.log("formattedBookings", formattedBookings)
-      setBookings(formattedBookings)
-    }
+    if (bookingData.data) setBookings(bookingData.data)
+    if (availabilityData.data) setAvailabilities(availabilityData.data)
   }
 
   return (
@@ -112,6 +103,7 @@ export default function AdminDashboard() {
           instructors={instructors}
           addresses={addresses}
           bookings={bookings}
+          availabilities={availabilities}
           fetchData={fetchData}
         />
       )}

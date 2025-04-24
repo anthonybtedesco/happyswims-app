@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -69,15 +70,22 @@ export default function LoginForm() {
       if (error) throw error
 
       const userRole = data.user?.user_metadata?.role
+      const currentUrl = window.location.href;
       switch (userRole) {
         case 'instructor':
-          window.location.href = 'https://instructor.happyswims.life'
-          break
+          if (currentUrl !== 'https://instructor.happyswims.life') {
+            window.location.href = 'https://instructor.happyswims.life';
+          }
+          break;
         case 'client':
-          window.location.href = 'https://book.happyswims.life'
-          break
+          if (currentUrl !== 'https://book.happyswims.life') {
+            window.location.href = 'https://book.happyswims.life';
+          }
+          break;
         default:
-          window.location.href = 'https://book.happyswims.life'
+          if (currentUrl !== 'https://book.happyswims.life') {
+            window.location.href = 'https://book.happyswims.life';
+          }
       }
     } catch (error) {
       console.error('Error:', error)
