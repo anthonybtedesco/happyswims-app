@@ -11,14 +11,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import BookingCreateModal from '@/components/modals/BookingCreateModal'
 import ClientCreateModal from '@/components/modals/ClientCreateModal'
 import InstructorCreateModal from '@/components/modals/InstructorCreateModal'
-import { Address, Instructor, Client } from '@/lib/types/supabase'
+import { Address, Instructor, Client, Availability, Booking } from '@/lib/types/supabase'
 
 interface HomeTabProps {
   users: any[]
   clients: Client[]
   instructors: Instructor[]
   addresses: Address[]
-  bookings: any[]
+  bookings: Booking[]
+  availabilities: Availability[]
   fetchData: () => Promise<void>
 }
 
@@ -28,6 +29,7 @@ export default function HomeTab({
   instructors, 
   addresses, 
   bookings,
+  availabilities,
   fetchData
 }: HomeTabProps) {
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
@@ -70,7 +72,39 @@ export default function HomeTab({
             center: 'title',
             right: 'dayGridMonth,timeGridWeek,timeGridDay'
           }}
-          events={selectedUser ? bookings.filter(booking => booking.client_id === clients.find(client => client.id === selectedUser)?.id) : bookings}
+          events={(() => {
+            // Convert bookings to calendar events
+            const bookingEvents = (selectedUser 
+              ? bookings.filter(booking => booking.client_id === clients.find(client => client.id === selectedUser)?.id)
+              : bookings
+            ).map(booking => ({
+              id: booking.id,
+              title: `Booking: ${clients.find(c => c.id === booking.client_id)?.first_name || ''} ${clients.find(c => c.id === booking.client_id)?.last_name || ''} with ${instructors.find(i => i.id === booking.instructor_id)?.first_name || ''} ${instructors.find(i => i.id === booking.instructor_id)?.last_name || ''}`,
+              start: booking.start_time,
+              end: booking.end_time,
+              backgroundColor: '#4CAF50',  // Green for bookings
+              borderColor: '#388E3C'
+            }));
+
+            // Convert availabilities to calendar events
+            const availabilityEvents = (selectedUser
+              ? availabilities.filter(avail => {
+                  const instructor = instructors.find(i => i.id === avail.instructor_id);
+                  return instructor?.user_id === selectedUser;
+                })
+              : availabilities
+            ).map(avail => ({
+              id: `avail-${avail.id}`,
+              title: `Available: ${instructors.find(i => i.id === avail.instructor_id)?.first_name || ''} ${instructors.find(i => i.id === avail.instructor_id)?.last_name || ''}`,
+              start: avail.start_date,
+              end: avail.end_date,
+              backgroundColor: avail.color || '#2196F3',  // Blue for availabilities
+              borderColor: '#1976D2',
+              display: 'background'
+            }));
+
+            return [...bookingEvents, ...availabilityEvents];
+          })()}
           height="80vh"
           firstDay={1}
         />

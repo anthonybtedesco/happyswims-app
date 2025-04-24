@@ -6,7 +6,7 @@ import { colors, buttonVariants } from '@/lib/colors'
 import { MapComponent, calculateMatrix, formatDuration } from '@/lib/mapbox'
 import '@/styles/map.css'
 import AutofillAddress from '@/lib/mapbox/AutofillAddress'
-import { Address, Instructor, Client } from '@/lib/types/supabase'
+import { Address, Instructor, Client, BookingInsert } from '@/lib/types/supabase'
 import InstructorDrivetimes from '../InstructorDrivetimes'
 import { geocodeNewAddress } from '@/lib/geocoding'
 
@@ -29,10 +29,10 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
   const [success, setSuccess] = useState(false)
   const [showAddressForm, setShowAddressForm] = useState(false)
   const [instructorsWithTravelTime, setInstructorsWithTravelTime] = useState<InstructorWithTravelTime[]>(instructors)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Omit<BookingInsert, 'end_time'> & { duration: number }>({
     client_id: '',
     instructor_id: '',
-    pool_address: '',
+    pool_address_id: '',
     start_time: '',
     duration: 30,
     recurrence_weeks: 0,
@@ -73,33 +73,33 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
         return;
       }
       
-      if (!formData.pool_address || instructors.length === 0) {
+      if (!formData.pool_address_id || instructors.length === 0) {
         console.log('Cannot calculate travel times - missing pool address or instructors');
         setInstructorsWithTravelTime(instructors);
         return;
       }
       
       // Check if we've already processed this address to avoid infinite loops
-      if (processedAddressesRef.current.has(formData.pool_address)) {
+      if (processedAddressesRef.current.has(formData.pool_address_id)) {
         console.log('Already processed this pool address, using cached results');
         return;
       }
 
       try {
         isCalculatingRef.current = true;
-        console.log('Calculating travel times for instructors to pool:', formData.pool_address);
+        console.log('Calculating travel times for instructors to pool:', formData.pool_address_id);
         
         // Find selected pool address
         let selectedPool: Address | undefined;
-        const selectedPoolRaw = addresses.find(addr => addr.id === formData.pool_address);
+        const selectedPoolRaw = addresses.find(addr => addr.id === formData.pool_address_id);
         
         // If not found in addressesWithCoordinates, try finding in original addresses prop
         if (!selectedPoolRaw) {
           console.log('Address not found in addresses, trying original addresses');
-          const originalAddress = addresses.find(addr => addr.id === formData.pool_address);
+          const originalAddress = addresses.find(addr => addr.id === formData.pool_address_id);
           
           if (!originalAddress) {
-            console.error('Pool address not found in any address list:', formData.pool_address);
+            console.error('Pool address not found in any address list:', formData.pool_address_id);
             setInstructorsWithTravelTime(instructors);
             isCalculatingRef.current = false;
             return;
@@ -122,7 +122,7 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
         }
 
         // Mark this address as processed to avoid repeated processing
-        processedAddressesRef.current.add(formData.pool_address);
+        processedAddressesRef.current.add(formData.pool_address_id);
         
         // Get instructors with home addresses and ensure they have coordinates
         console.log('Processing instructor home addresses');
@@ -191,7 +191,7 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
 
     calculateTravelTimes();
   // Only depend on pool_address changes to avoid infinite loops
-  }, [formData.pool_address, instructors]);
+  }, [formData.pool_address_id, instructors]);
 
   const handleAddressSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -246,7 +246,7 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
         };
         
         console.log("Adding new address to state:", newAddress);
-        setFormData({ ...formData, pool_address: data[0].id });
+        setFormData({ ...formData, pool_address_id: data[0].id });
         setShowAddressForm(false);
       }
     } catch (err: any) {
@@ -279,7 +279,7 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
         return;
       }
       
-      if (!formData.pool_address) {
+      if (!formData.pool_address_id) {
         const errorMsg = "Please select a pool address";
         console.error(errorMsg);
         setError(errorMsg);
@@ -308,10 +308,15 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
         duration: formData.duration 
       });
 
-      const bookingData = {
-        ...formData,
+      const bookingData: BookingInsert = {
+        client_id: formData.client_id,
+        instructor_id: formData.instructor_id,
+        pool_address_id: formData.pool_address_id,
         start_time: startTime.toISOString(),
-        end_time: endTime.toISOString()
+        end_time: endTime.toISOString(),
+        duration: formData.duration,
+        recurrence_weeks: formData.recurrence_weeks,
+        status: formData.status
       };
       
       console.log("Saving booking to database:", bookingData);
@@ -329,7 +334,7 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
       setFormData({
         client_id: '',
         instructor_id: '',
-        pool_address: '',
+        pool_address_id: '',
         start_time: '',
         duration: 30,
         recurrence_weeks: 0,
@@ -422,7 +427,7 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
                   setFormData({ 
                     ...formData, 
                     client_id: e.target.value, 
-                    pool_address: selectedClient?.home_address_id || ''
+                    pool_address_id: selectedClient?.home_address_id || ''
                   });
                 }}
                 required
@@ -450,10 +455,10 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
               {!showAddressForm ? (
                 <>
                   <select
-                    value={formData.pool_address}
+                    value={formData.pool_address_id}
                     onChange={(e) => {
                       console.log("Selected pool address:", e.target.value);
-                      setFormData({ ...formData, pool_address: e.target.value });
+                      setFormData({ ...formData, pool_address_id: e.target.value });
                     }}
                     required
                     style={{
@@ -490,10 +495,10 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
                   <div style={{ marginTop: '1rem' }}>
                     <MapComponent 
                       addresses={addresses} 
-                      selectedAddressId={formData.pool_address}
+                      selectedAddressId={formData.pool_address_id}
                       onAddressSelect={(addressId) => {
                         console.log("Address selected from map:", addressId);
-                        setFormData({ ...formData, pool_address: addressId });
+                        setFormData({ ...formData, pool_address_id: addressId });
                       }}
                       height="250px"
                     />
@@ -557,7 +562,7 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
                   console.log("Selected instructor:", id);
                   setFormData({ ...formData, instructor_id: id });
                 }}
-                poolAddressId={formData.pool_address}
+                poolAddressId={formData.pool_address_id}
               />
             </div>
 

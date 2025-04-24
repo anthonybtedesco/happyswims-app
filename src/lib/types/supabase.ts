@@ -5,27 +5,35 @@ export type Database = {
         Row: {
           id: string
           created_at: string
-          user_id: string
+          pool_address_id: string
           client_id: string
           instructor_id: string
-          pool_address_id: string
           start_time: string
           end_time: string
           duration: number
           recurrence_weeks: number
+          calendar_event_id: string
+          google_event_link: string
+          user_id: string
+          booking_status: string
+          payment_status: string
           status: string
         }
         Insert: {
           id?: string
           created_at?: string
-          user_id?: string
+          pool_address_id: string
           client_id: string
           instructor_id: string
-          pool_address_id: string
           start_time: string
           end_time: string
           duration: number
           recurrence_weeks: number
+          calendar_event_id?: string
+          google_event_link?: string
+          user_id?: string
+          booking_status?: string
+          payment_status?: string
           status: string
         }
       }
