@@ -419,7 +419,6 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
                 onChange={(e) => {
                   console.log("Selected client:", e.target.value);
                   setFormData({ ...formData, client_id: e.target.value });
-                  
                 }}
                 required
                 style={{
