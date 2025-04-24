@@ -298,148 +298,150 @@ export default function DataTab({
 
   return (
     <div className="data-tab">
-      <style jsx>{`
-        .data-tab {
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        }
-        
-        .tab-buttons {
-          display: flex;
-          gap: 2px;
-          margin-bottom: 0;
-        }
-        
-        .tab-button {
-          padding: 10px 20px;
-          background-color: #f5f7fa;
-          border: 1px solid #e1e5eb;
-          border-bottom: none;
-          border-radius: 8px 8px 0 0;
-          cursor: pointer;
-          font-weight: 500;
-          color: #64748b;
-          transition: all 0.2s ease;
-          position: relative;
-          z-index: 1;
-        }
-        
-        .tab-button:hover {
-          background-color: #fff;
-          color: #334155;
-        }
-        
-        .tab-button.active {
-          background-color: #fff;
-          color: #334155;
-          font-weight: 600;
-          box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.03);
-          z-index: 2;
-        }
-        
-        .tab-content {
-          background-color: #fff;
-          border: 1px solid #e1e5eb;
-          border-radius: 0 8px 8px 8px;
-          padding: 24px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-          z-index: 1;
-        }
-        
-        .table-container {
-          overflow-x: auto;
-          border-radius: 6px;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-        }
-        
-        .data-table {
-          width: 100%;
-          border-collapse: separate;
-          border-spacing: 0;
-          font-size: 14px;
-        }
-        
-        .data-table th {
-          text-align: left;
-          padding: 12px 16px;
-          background-color: #f8fafc;
-          border-bottom: 1px solid #e4e9f0;
-          color: #64748b;
-          font-weight: 600;
-          position: sticky;
-          top: 0;
-        }
-        
-        .data-table td {
-          padding: 0;
-          border-bottom: 1px solid #f0f2f5;
-        }
-        
-        .data-table tr:last-child td {
-          border-bottom: none;
-        }
-        
-        .data-table tr:hover {
-          background-color: #f9fafc;
-        }
-        
-        .cell-readonly, 
-        .cell-editable div {
-          padding: 12px 16px;
-          height: 100%;
-          position: relative;
-        }
-        
-        .cell-editable {
-          position: relative;
-          cursor: pointer;
-        }
-        
-        .cell-editable div {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-        
-        .edit-indicator {
-          opacity: 0;
-          width: 14px;
-          height: 14px;
-          margin-left: 6px;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z'%3E%3C/path%3E%3C/svg%3E");
-          background-repeat: no-repeat;
-          transition: opacity 0.2s ease;
-        }
-        
-        .cell-editable:hover .edit-indicator {
-          opacity: 1;
-        }
-        
-        .cell-editable:hover {
-          background-color: #f0f7ff;
-        }
-        
-        .cell-editable:hover::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 3px;
-          height: 100%;
-          background-color: #3b82f6;
-          opacity: 0.6;
-        }
-        
-        .cell-input {
-          width: 100%;
-          padding: 11px 15px;
-          font-size: 14px;
-          border: 2px solid #3b82f6;
-          border-radius: 0;
-          height: 100%;
-          outline: none;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-        }
-      `}</style>
+      <style>
+        {`
+          .data-tab {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          }
+          
+          .tab-buttons {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 0;
+          }
+          
+          .tab-button {
+            padding: 10px 20px;
+            background-color: #f5f7fa;
+            border: 1px solid #e1e5eb;
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-weight: 500;
+            color: #64748b;
+            transition: all 0.2s ease;
+            position: relative;
+            z-index: 1;
+          }
+          
+          .tab-button:hover {
+            background-color: #fff;
+            color: #334155;
+          }
+          
+          .tab-button.active {
+            background-color: #fff;
+            color: #334155;
+            font-weight: 600;
+            box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.03);
+            z-index: 2;
+          }
+          
+          .tab-content {
+            background-color: #fff;
+            border: 1px solid #e1e5eb;
+            border-radius: 0 8px 8px 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            z-index: 1;
+          }
+          
+          .table-container {
+            overflow-x: auto;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+          }
+          
+          .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 14px;
+          }
+          
+          .data-table th {
+            text-align: left;
+            padding: 12px 16px;
+            background-color: #f8fafc;
+            border-bottom: 1px solid #e4e9f0;
+            color: #64748b;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+          }
+          
+          .data-table td {
+            padding: 0;
+            border-bottom: 1px solid #f0f2f5;
+          }
+          
+          .data-table tr:last-child td {
+            border-bottom: none;
+          }
+          
+          .data-table tr:hover {
+            background-color: #f9fafc;
+          }
+          
+          .cell-readonly, 
+          .cell-editable div {
+            padding: 12px 16px;
+            height: 100%;
+            position: relative;
+          }
+          
+          .cell-editable {
+            position: relative;
+            cursor: pointer;
+          }
+          
+          .cell-editable div {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+          }
+          
+          .edit-indicator {
+            opacity: 0;
+            width: 14px;
+            height: 14px;
+            margin-left: 6px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            transition: opacity 0.2s ease;
+          }
+          
+          .cell-editable:hover .edit-indicator {
+            opacity: 1;
+          }
+          
+          .cell-editable:hover {
+            background-color: #f0f7ff;
+          }
+          
+          .cell-editable:hover::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+            background-color: #3b82f6;
+            opacity: 0.6;
+          }
+          
+          .cell-input {
+            width: 100%;
+            padding: 11px 15px;
+            font-size: 14px;
+            border: 2px solid #3b82f6;
+            border-radius: 0;
+            height: 100%;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+          }
+        `}
+      </style>
       <div className="tab-buttons">
         <button 
           onClick={() => setSelectedTable('clients')}
