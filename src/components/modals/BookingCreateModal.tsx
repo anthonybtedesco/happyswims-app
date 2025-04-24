@@ -5,21 +5,11 @@ import { supabase } from '@/lib/supabase/client'
 import { colors, buttonVariants } from '@/lib/colors'
 import { MapComponent, calculateMatrix, formatDuration } from '@/lib/mapbox'
 import { geocodeNewAddress, geocodeAndUpdateAddress } from '@/lib/geocoding'
-import AddressAutofillInput from '@/components/AddressAutofillInput'
 import { MAPBOX_ACCESS_TOKEN } from '@/lib/mapbox/config'
 import '@/styles/map.css'
 import { AddressAutofill } from '@mapbox/search-js-react'
 import AutofillAddress from '@/lib/mapbox/AutofillAddress'
-
-type Address = {
-  id: string
-  address_line: string
-  city: string
-  state: string
-  zip: string
-  latitude?: number
-  longitude?: number
-}
+import { Address } from '@/lib/types/supabase'
 
 type Instructor = {
   id: string
@@ -650,59 +640,6 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
                       onAddressSelect={(addressId) => {
                         console.log("Address selected from map:", addressId);
                         setFormData({ ...formData, pool_address: addressId });
-                      }}
-                      onAddressesGeocoded={(geocodedAddresses) => {
-                        // EMERGENCY FIX: Disable geocoding callbacks to prevent API request loops
-                        console.log("MapComponent geocoding callback received - DISABLED FOR SAFETY");
-                        return; // Early return to prevent any state updates
-                        
-                        /*
-                        console.log("Addresses geocoded callback received:", geocodedAddresses);
-                        console.log("Number of geocoded addresses:", geocodedAddresses?.length || 0);
-                        
-                        if (geocodedAddresses && geocodedAddresses.length > 0) {
-                          // Log first few addresses to see their structure
-                          console.log("Sample geocoded address:", JSON.stringify(geocodedAddresses[0]));
-                          
-                          // Create a map for quick lookup
-                          const addressMap = new Map(
-                            addressesWithCoordinates.map(addr => [addr.id, addr])
-                          );
-                          
-                          // Update addresses with geocoded information
-                          const updatedAddresses = geocodedAddresses.map(geocoded => {
-                            const existingAddress = addressMap.get(geocoded.id);
-                            if (!existingAddress) return geocoded;
-                            
-                            if (geocoded.lat && geocoded.lng) {
-                              console.log(`Found geocoded data for address ${geocoded.id}: lat=${geocoded.lat}, lng=${geocoded.lng}`);
-                              return {
-                                ...existingAddress,
-                                lat: geocoded.lat,
-                                lng: geocoded.lng
-                              };
-                            }
-                            return existingAddress;
-                          });
-                          
-                          console.log("Updating addressesWithCoordinates with geocoded data");
-                          setAddressesWithCoordinates(updatedAddresses);
-                          
-                          // If we have coordinates for the currently selected address, trigger recalculation
-                          if (formData.pool_address) {
-                            const selectedWithCoords = updatedAddresses.find(
-                              addr => addr.id === formData.pool_address && addr.lat && addr.lng
-                            );
-                            if (selectedWithCoords) {
-                              console.log("Selected address now has coordinates, clearing processed cache to force recalculation");
-                              // Clear processed addresses to force recalculation
-                              processedAddressesRef.current.delete(formData.pool_address);
-                            }
-                          }
-                        } else {
-                          console.warn("No geocoded addresses received from MapComponent");
-                        }
-                        */
                       }}
                       height="250px"
                     />
