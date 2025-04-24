@@ -13,29 +13,8 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import ClientCreateModal from '@/components/modals/ClientCreateModal'
 import InstructorCreateModal from '@/components/modals/InstructorCreateModal'
+import { Address, Instructor, Client } from '@/lib/types/supabase'
 
-type Instructor = {
-  id: string
-  first_name: string
-  last_name: string
-}
-
-type Client = {
-  id: string
-  first_name: string
-  last_name: string
-  user_id: string
-}
-
-type Address = {
-  id: string
-  address_line: string
-  city: string
-  state: string
-  zip: string
-  latitude: number
-  longitude: number
-}
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([])

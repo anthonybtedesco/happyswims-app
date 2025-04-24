@@ -4,27 +4,12 @@ import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { colors, buttonVariants } from '@/lib/colors'
 import { MapComponent, calculateMatrix, formatDuration } from '@/lib/mapbox'
-import { geocodeNewAddress, geocodeAndUpdateAddress } from '@/lib/geocoding'
-import { MAPBOX_ACCESS_TOKEN } from '@/lib/mapbox/config'
 import '@/styles/map.css'
-import { AddressAutofill } from '@mapbox/search-js-react'
 import AutofillAddress from '@/lib/mapbox/AutofillAddress'
-import { Address } from '@/lib/types/supabase'
+import { Address, Instructor, Client } from '@/lib/types/supabase'
+import InstructorDrivetimes from '../InstructorDrivetimes'
+import { geocodeNewAddress } from '@/lib/geocoding'
 
-type Instructor = {
-  id: string
-  first_name: string
-  last_name: string
-  home_address?: Address
-  specialties?: string[]
-  travel_time_seconds?: number | null
-}
-
-type Client = {
-  id: string
-  first_name: string
-  last_name: string
-}
 
 type BookingCreateModalProps = {
   isOpen: boolean
@@ -33,109 +18,6 @@ type BookingCreateModalProps = {
   clients: Client[]
   addresses: Address[]
 }
-
-// Component to display instructors in a table with travel times
-const InstructorTable = ({ 
-  instructors, 
-  selectedInstructorId,
-  onInstructorSelect,
-  poolAddressId
-}: { 
-  instructors: Instructor[], 
-  selectedInstructorId: string,
-  onInstructorSelect: (id: string) => void,
-  poolAddressId: string
-}) => {
-  return (
-    <div style={{ 
-      maxHeight: '250px', 
-      overflowY: 'auto',
-      border: `1px solid ${colors.border.light}`,
-      borderRadius: '6px'
-    }}>
-      <table style={{ 
-        width: '100%', 
-        borderCollapse: 'collapse',
-        fontSize: '0.875rem'
-      }}>
-        <thead style={{
-          position: 'sticky',
-          top: 0,
-          backgroundColor: colors.common.white,
-          borderBottom: `1px solid ${colors.border.light}`,
-          zIndex: 10
-        }}>
-          <tr>
-            <th style={{ 
-              padding: '0.75rem', 
-              textAlign: 'left',
-              color: colors.text.secondary
-            }}>Instructor</th>
-            <th style={{ 
-              padding: '0.75rem', 
-              textAlign: 'left',
-              color: colors.text.secondary 
-            }}>Specialties</th>
-            <th style={{ 
-              padding: '0.75rem', 
-              textAlign: 'left',
-              color: colors.text.secondary 
-            }}>Drive Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          {instructors.map(instructor => (
-            <tr 
-              key={instructor.id}
-              onClick={() => onInstructorSelect(instructor.id)}
-              style={{
-                cursor: 'pointer',
-                backgroundColor: instructor.id === selectedInstructorId ? `${colors.primary[300]}40` : 'transparent',
-                borderBottom: `1px solid ${colors.border.light}`
-              }}
-            >
-              <td style={{ padding: '0.75rem' }}>
-                {instructor.first_name} {instructor.last_name}
-              </td>
-              <td style={{ padding: '0.75rem' }}>
-                {instructor.specialties?.join(', ') || 'N/A'}
-              </td>
-              <td style={{ 
-                padding: '0.75rem',
-                color: instructor.travel_time_seconds !== undefined && instructor.travel_time_seconds !== null ? (
-                  instructor.travel_time_seconds > 1800 ? colors.status.error : // Over 30 min
-                  instructor.travel_time_seconds > 900 ? colors.status.warning : // Over 15 min
-                  colors.status.success
-                ) : colors.text.secondary
-              }}>
-                {poolAddressId ? (
-                  formatDuration(instructor.travel_time_seconds || null)
-                ) : (
-                  'Select a pool first'
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-// Helper function to ensure address has coordinates
-const ensureAddressCoordinates = async (address: Address, forceGeocode: boolean = false): Promise<Address> => {
-  console.log('ensureAddressCoordinates called for address:', address);
-  
-  // EMERGENCY FIX: Return the address as-is without geocoding to prevent API requests
-  console.log('EMERGENCY MODE: Skipping geocoding to prevent API requests');
-  return address;
-  
-  // The below code is temporarily disabled to prevent API call loops
-  /*
-  // Use our new utility function instead
-  return await geocodeAndUpdateAddress(address);
-  */
-};
 
 export default function BookingCreateModal({ isOpen, onClose, instructors, clients, addresses }: BookingCreateModalProps) {
   const [error, setError] = useState<string | null>(null)
@@ -159,8 +41,6 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
     zip: ''
   })
 
-  const [addressesWithCoordinates, setAddressesWithCoordinates] = useState<Address[]>(addresses);
-  
   // Use a ref to track processing state to prevent infinite loops
   const isCalculatingRef = useRef(false);
   // Track which addresses have been processed
@@ -173,30 +53,6 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
     console.log('Initial clients:', clients);
     console.log('Initial addresses:', addresses);
   }, [isOpen, instructors, clients, addresses]);
-
-  // Ensure addressesWithCoordinates stays in sync with addresses prop
-  useEffect(() => {
-    console.log('Updating addressesWithCoordinates from addresses prop');
-    
-    // Create a map of existing addresses for quick lookup
-    const existingAddressMap = new Map(
-      addressesWithCoordinates.map(addr => [addr.id, addr])
-    );
-    
-    // Merge addresses with existingAddresses, preferring existing when available
-    const mergedAddresses = addresses.map(address => {
-      // If we already have this address with coordinates, keep it
-      if (existingAddressMap.has(address.id)) {
-        return existingAddressMap.get(address.id)!;
-      }
-      // Otherwise use the new address
-      return address;
-    });
-    
-    console.log('Merged addresses:', mergedAddresses);
-    setAddressesWithCoordinates(mergedAddresses);
-    // Only run when addresses prop changes, not when addressesWithCoordinates changes
-  }, [addresses]);
 
   // Log form data changes
   useEffect(() => {
@@ -230,11 +86,11 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
         
         // Find selected pool address
         let selectedPool: Address | undefined;
-        const selectedPoolRaw = addressesWithCoordinates.find(addr => addr.id === formData.pool_address);
+        const selectedPoolRaw = addresses.find(addr => addr.id === formData.pool_address);
         
         // If not found in addressesWithCoordinates, try finding in original addresses prop
         if (!selectedPoolRaw) {
-          console.log('Address not found in addressesWithCoordinates, trying original addresses');
+          console.log('Address not found in addresses, trying original addresses');
           const originalAddress = addresses.find(addr => addr.id === formData.pool_address);
           
           if (!originalAddress) {
@@ -246,11 +102,11 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
           
           // Process this address without updating state immediately to avoid loops
           console.log('Found address in original addresses:', originalAddress);
-          selectedPool = await ensureAddressCoordinates(originalAddress);
+          selectedPool = originalAddress;
         } else {
           // Ensure the selected pool has coordinates
           console.log('Ensuring pool address has coordinates');
-          selectedPool = await ensureAddressCoordinates(selectedPoolRaw);
+          selectedPool = selectedPoolRaw;
         }
         
         if (!selectedPool || !selectedPool.latitude || !selectedPool.longitude) {
@@ -265,50 +121,36 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
         
         // Get instructors with home addresses and ensure they have coordinates
         console.log('Processing instructor home addresses');
-        const instructorsWithCoordinates = await Promise.all(
-          instructors
-            .filter(inst => inst.home_address)
-            .map(async (inst) => {
-              if (!inst.home_address) return inst;
-              
-              const homeWithCoordinates = await ensureAddressCoordinates(inst.home_address);
-              return {
-                ...inst,
-                home_address: homeWithCoordinates
-              };
-            })
-        );
 
-        const validInstructors = instructorsWithCoordinates.filter(
-          inst => inst.home_address?.latitude && inst.home_address?.longitude
-        );
-
-        if (validInstructors.length === 0) {
+        if (instructors.length === 0) {
           console.warn('No instructors have valid home address coordinates after processing');
           setInstructorsWithTravelTime(instructors);
           isCalculatingRef.current = false;
           return;
         }
 
-        console.log(`Found ${validInstructors.length} instructors with valid home addresses`);
+        console.log(`Found ${instructors.length} instructors with valid home addresses`);
 
         // Prepare coordinates for Matrix API
-        const sources = validInstructors.map(inst => ({ 
-          lat: inst.home_address!.latitude!,
-          lng: inst.home_address!.longitude!
-        }));
+        const sources = instructors.map(inst => {
+          const homeAddress = addresses.find(addr => addr.id === inst.home_address_id);
+          return {
+            lat: homeAddress?.latitude,
+            lng: homeAddress?.longitude
+          };
+        }).filter(coord => coord.lat !== undefined && coord.lng !== undefined);
         
         const destinations = [{ lat: selectedPool.latitude!, lng: selectedPool.longitude! }];
 
         // Call Matrix API
         console.log('Calling Matrix API with sources:', sources, 'and destinations:', destinations);
-        const result = await calculateMatrix(sources, destinations);
+        const result = await calculateMatrix(sources as {lat: number, lng: number}[], destinations as {lat: number, lng: number}[]);
         console.log('Matrix API result:', result);
 
         // Update instructors with travel times
         const updatedInstructors = instructors.map((instructor) => {
           // Find index in validInstructors to map to Matrix API result
-          const validIndex = validInstructors.findIndex(i => i.id === instructor.id);
+          const validIndex = instructors.findIndex(i => i.id === instructor.id);
           
           if (validIndex !== -1 && result.durations && result.durations[validIndex]) {
             return {
@@ -322,10 +164,13 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
 
         // Sort instructors by travel time (instructors without travel time at the end)
         updatedInstructors.sort((a, b) => {
-          if (a.travel_time_seconds === undefined && b.travel_time_seconds === undefined) return 0;
-          if (a.travel_time_seconds === undefined) return 1;
-          if (b.travel_time_seconds === undefined) return -1;
-          return a.travel_time_seconds! - b.travel_time_seconds!;
+          const aTravelTime = 'travel_time_seconds' in a ? a.travel_time_seconds : undefined;
+          const bTravelTime = 'travel_time_seconds' in b ? b.travel_time_seconds : undefined;
+          
+          if (aTravelTime === undefined && bTravelTime === undefined) return 0;
+          if (aTravelTime === undefined) return 1;
+          if (bTravelTime === undefined) return -1;
+          return aTravelTime! - bTravelTime!;
         });
 
         console.log('Updated instructors with travel times:', updatedInstructors);
@@ -396,7 +241,6 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
         };
         
         console.log("Adding new address to state:", newAddress);
-        setAddressesWithCoordinates([...addressesWithCoordinates, newAddress]);
         setFormData({ ...formData, pool_address: data[0].id });
         setShowAddressForm(false);
       }
@@ -635,7 +479,7 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
                   
                   <div style={{ marginTop: '1rem' }}>
                     <MapComponent 
-                      addresses={addressesWithCoordinates} 
+                      addresses={addresses} 
                       selectedAddressId={formData.pool_address}
                       onAddressSelect={(addressId) => {
                         console.log("Address selected from map:", addressId);
@@ -696,7 +540,7 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
               <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.text.secondary }}>
                 Instructor
               </label>
-              <InstructorTable 
+              <InstructorDrivetimes
                 instructors={instructorsWithTravelTime}
                 selectedInstructorId={formData.instructor_id}
                 onInstructorSelect={(id) => {
