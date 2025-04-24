@@ -1,8 +1,10 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Address, Instructor, Client } from '@/lib/types/supabase'
+import MapComponent from '@/lib/mapbox/MapComponent'
+import SendPasswordResetEmailButton from '@/components/buttons/SendPasswordResetEmailButton'
 
 interface DataTabProps {
   clients: Client[]
@@ -10,6 +12,11 @@ interface DataTabProps {
   addresses: Address[]
   bookings: any[]
   fetchData: () => Promise<void>
+}
+
+interface UserWithEmail {
+  id: string;
+  email: string;
 }
 
 export default function DataTab({
@@ -21,6 +28,37 @@ export default function DataTab({
 }: DataTabProps) {
   const [selectedTable, setSelectedTable] = useState('clients')
   const [editingCell, setEditingCell] = useState<{rowId: string, column: string, value: string} | null>(null)
+  const [userEmails, setUserEmails] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const fetchUserEmails = async () => {
+      const userIds = [...clients, ...instructors].map(u => u.user_id)
+      
+      try {
+        const response = await fetch('/api/auth/list-users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userIds }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch user emails')
+        }
+
+        setUserEmails(data.users)
+      } catch (error) {
+        console.error('Error fetching user emails:', error)
+      }
+    }
+
+    if (clients.length > 0 || instructors.length > 0) {
+      fetchUserEmails()
+    }
+  }, [clients, instructors])
 
   const handleCellChange = async (e: React.ChangeEvent<HTMLInputElement>, rowId: string, column: string, table: string) => {
     const value = e.target.value
@@ -60,7 +98,9 @@ export default function DataTab({
                   <th>ID</th>
                   <th>First Name</th>
                   <th>Last Name</th>
+                  <th>Email</th>
                   <th>Home Address</th>
+                  <th>Password Reset</th>
                 </tr>
               </thead>
               <tbody>
@@ -100,7 +140,15 @@ export default function DataTab({
                       )}
                     </td>
                     <td className="cell-readonly">
+                      {userEmails[client.user_id] || 'No email'}
+                    </td>
+                    <td className="cell-readonly">
                       {addresses.find(addr => addr.id === client.home_address_id)?.address_line || 'No address'}
+                    </td>
+                    <td className="button-cell">
+                      {userEmails[client.user_id] && (
+                        <SendPasswordResetEmailButton email={userEmails[client.user_id]} />
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -117,7 +165,9 @@ export default function DataTab({
                   <th>ID</th>
                   <th>First Name</th>
                   <th>Last Name</th>
+                  <th>Email</th>
                   <th>Home Address</th>
+                  <th>Password Reset</th>
                 </tr>
               </thead>
               <tbody>
@@ -157,7 +207,15 @@ export default function DataTab({
                       )}
                     </td>
                     <td className="cell-readonly">
+                      {userEmails[instructor.user_id] || 'No email'}
+                    </td>
+                    <td className="cell-readonly">
                       {addresses.find(addr => addr.id === instructor.home_address_id)?.address_line || 'No address'}
+                    </td>
+                    <td className="button-cell">
+                      {userEmails[instructor.user_id] && (
+                        <SendPasswordResetEmailButton email={userEmails[instructor.user_id]} />
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -441,6 +499,32 @@ export default function DataTab({
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
             background-color: #ffffff;
           }
+          
+          .button-cell {
+            padding: 8px 16px;
+            text-align: center;
+            background-color: #f8fafc;
+          }
+          
+          .button-cell button {
+            padding: 6px 12px;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background-color 0.2s ease;
+          }
+          
+          .button-cell button:hover {
+            background-color: #2563eb;
+          }
+          
+          .button-cell button:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+          }
         `}
       </style>
       <div className="tab-buttons">
@@ -470,6 +554,34 @@ export default function DataTab({
         </button>
       </div>
       <div className="tab-content">
+        <div style={{ marginBottom: '24px' }}>
+          <MapComponent
+            addresses={
+              selectedTable === 'addresses' ? addresses :
+              selectedTable === 'clients' ? addresses.filter(addr => 
+                clients.some(client => client.home_address_id === addr.id)
+              ) :
+              selectedTable === 'instructors' ? addresses.filter(addr => 
+                instructors.some(instructor => instructor.home_address_id === addr.id)
+              ) :
+              selectedTable === 'bookings' ? addresses.filter(addr => {
+                const clientAddressIds = new Set(
+                  bookings
+                    .map(booking => clients.find(c => c.id === booking.client_id)?.home_address_id)
+                    .filter(Boolean)
+                );
+                const instructorAddressIds = new Set(
+                  bookings
+                    .map(booking => instructors.find(i => i.id === booking.instructor_id)?.home_address_id)
+                    .filter(Boolean)
+                );
+                return clientAddressIds.has(addr.id) || instructorAddressIds.has(addr.id);
+              }) :
+              []
+            }
+            height="400px"
+          />
+        </div>
         {renderTableData()}
       </div>
     </div>

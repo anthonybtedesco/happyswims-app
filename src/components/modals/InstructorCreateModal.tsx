@@ -5,7 +5,8 @@ import { supabase } from '@/lib/supabase/client'
 import { colors, buttonVariants } from '@/lib/colors'
 import { adminSignUp } from '@/lib/auth'
 import { geocodeNewAddress } from '@/lib/geocoding'
-import { MAPBOX_ACCESS_TOKEN } from '@/lib/mapbox/config'
+import { Address, Instructor, Booking, Client } from '@/lib/types/supabase'
+
 
 import AutofillAddress from '@/lib/mapbox/AutofillAddress'
 type InstructorCreateModalProps = {
@@ -83,7 +84,7 @@ export default function InstructorCreateModal({ isOpen, onClose }: InstructorCre
         first_name: formData.first_name,
         last_name: formData.last_name,
         user_id: data.user.id,
-        home_address: addressData.id
+        home_address_id: addressData.id
       }
       console.log('Instructor Data:', instructorData)
 

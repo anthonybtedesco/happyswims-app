@@ -8,7 +8,7 @@ export type Database = {
           user_id: string
           client_id: string
           instructor_id: string
-          pool_address: string
+          pool_address_id: string
           start_time: string
           end_time: string
           duration: number
@@ -21,7 +21,7 @@ export type Database = {
           user_id?: string
           client_id: string
           instructor_id: string
-          pool_address: string
+          pool_address_id: string
           start_time: string
           end_time: string
           duration: number

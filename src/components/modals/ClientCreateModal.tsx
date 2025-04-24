@@ -98,7 +98,7 @@ export default function ClientCreateModal({ isOpen, onClose }: ClientCreateModal
         first_name: formData.first_name,
         last_name: formData.last_name,
         user_id: userId,
-        home_address: addressData.id
+        home_address_id: addressData.id
       }
       console.log('Client Data:', clientData)
 
