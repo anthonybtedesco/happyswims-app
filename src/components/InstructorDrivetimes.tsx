@@ -75,7 +75,7 @@ export default function InstructorDrivetimes({
                 {instructor.specialties || 'No specialties listed'}
               </td>
               <td style={{ padding: '0.75rem' }}>
-                {poolAddressId && instructor.travel_time_seconds !== undefined ? (
+                {poolAddressId && instructor.travel_time_seconds !== undefined && instructor.travel_time_seconds !== null ? (
                   formatDuration(instructor.travel_time_seconds)
                 ) : (
                   'Select a pool first'
