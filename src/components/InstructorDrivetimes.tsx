@@ -1,5 +1,12 @@
 import { colors } from "@/lib/colors"
 import { Instructor } from "@/lib/types/supabase"
+import { formatDuration } from "@/lib/mapbox"
+
+// Extended instructor type that includes travel time
+type InstructorWithTravelTime = Instructor & {
+  travel_time_seconds?: number;
+  specialties?: string;
+}
 
 // Component to display instructors in a table with travel times
 export default function InstructorDrivetimes({ 
@@ -8,7 +15,7 @@ export default function InstructorDrivetimes({
   onInstructorSelect,
   poolAddressId
 }: { 
-  instructors: Instructor[], 
+  instructors: InstructorWithTravelTime[], 
   selectedInstructorId: string,
   onInstructorSelect: (id: string) => void,
   poolAddressId: string
@@ -64,12 +71,12 @@ export default function InstructorDrivetimes({
               <td style={{ padding: '0.75rem' }}>
                 {instructor.first_name} {instructor.last_name}
               </td>
-              <td style={{ 
-                padding: '0.75rem',
-
-              }}>
-                {poolAddressId ? (
-                  'Select a pool first'
+              <td style={{ padding: '0.75rem' }}>
+                {instructor.specialties || 'No specialties listed'}
+              </td>
+              <td style={{ padding: '0.75rem' }}>
+                {poolAddressId && instructor.travel_time_seconds !== undefined ? (
+                  formatDuration(instructor.travel_time_seconds)
                 ) : (
                   'Select a pool first'
                 )}
