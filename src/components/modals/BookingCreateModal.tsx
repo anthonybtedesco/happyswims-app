@@ -418,7 +418,12 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
                 value={formData.client_id}
                 onChange={(e) => {
                   console.log("Selected client:", e.target.value);
-                  setFormData({ ...formData, client_id: e.target.value,  });
+                  const selectedClient = clients.find(client => client.id === e.target.value);
+                  setFormData({ 
+                    ...formData, 
+                    client_id: e.target.value, 
+                    pool_address: selectedClient?.home_address_id || ''
+                  });
                 }}
                 required
                 style={{
