@@ -439,6 +439,7 @@ export default function DataTab({
             height: 100%;
             outline: none;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+            back
           }
         `}
       </style>
