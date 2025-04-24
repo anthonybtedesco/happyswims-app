@@ -4,7 +4,7 @@ import { formatDuration } from "@/lib/mapbox"
 
 // Extended instructor type that includes travel time
 type InstructorWithTravelTime = Instructor & {
-  travel_time_seconds?: number;
+  travel_time_seconds?: number | null;
   specialties?: string;
 }
 

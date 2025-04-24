@@ -10,6 +10,11 @@ import { Address, Instructor, Client } from '@/lib/types/supabase'
 import InstructorDrivetimes from '../InstructorDrivetimes'
 import { geocodeNewAddress } from '@/lib/geocoding'
 
+// Extended instructor type that includes travel time
+type InstructorWithTravelTime = Instructor & {
+  travel_time_seconds?: number | null;
+  specialties?: string;
+}
 
 type BookingCreateModalProps = {
   isOpen: boolean
@@ -23,7 +28,7 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [showAddressForm, setShowAddressForm] = useState(false)
-  const [instructorsWithTravelTime, setInstructorsWithTravelTime] = useState<Instructor[]>(instructors)
+  const [instructorsWithTravelTime, setInstructorsWithTravelTime] = useState<InstructorWithTravelTime[]>(instructors)
   const [formData, setFormData] = useState({
     client_id: '',
     instructor_id: '',
