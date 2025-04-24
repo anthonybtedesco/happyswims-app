@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Address, Instructor, Client } from '@/lib/types/supabase'
 import MapComponent from '@/lib/mapbox/MapComponent'
-import SendPasswordResetEmailButton from '@/components/buttons/SendPasswordResetEmailButton'
 
 interface DataTabProps {
   clients: Client[]
@@ -100,7 +99,6 @@ export default function DataTab({
                   <th>Last Name</th>
                   <th>Email</th>
                   <th>Home Address</th>
-                  <th>Password Reset</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,11 +143,6 @@ export default function DataTab({
                     <td className="cell-readonly">
                       {addresses.find(addr => addr.id === client.home_address_id)?.address_line || 'No address'}
                     </td>
-                    <td className="button-cell">
-                      {userEmails[client.user_id] && (
-                        <SendPasswordResetEmailButton email={userEmails[client.user_id]} />
-                      )}
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -167,7 +160,6 @@ export default function DataTab({
                   <th>Last Name</th>
                   <th>Email</th>
                   <th>Home Address</th>
-                  <th>Password Reset</th>
                 </tr>
               </thead>
               <tbody>
@@ -211,11 +203,6 @@ export default function DataTab({
                     </td>
                     <td className="cell-readonly">
                       {addresses.find(addr => addr.id === instructor.home_address_id)?.address_line || 'No address'}
-                    </td>
-                    <td className="button-cell">
-                      {userEmails[instructor.user_id] && (
-                        <SendPasswordResetEmailButton email={userEmails[instructor.user_id]} />
-                      )}
                     </td>
                   </tr>
                 ))}

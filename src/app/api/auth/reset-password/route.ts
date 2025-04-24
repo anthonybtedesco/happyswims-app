@@ -35,6 +35,10 @@ export async function POST(request: Request) {
     const userRole = user.user_metadata?.role
     console.log('API Route: User role:', userRole)
 
+
+    // Format the redirect URL exactly as required by Supabase
+    const getURL = () => {
+        
     // Determine the correct redirect URL based on role
     let baseRedirectUrl
     switch (userRole) {
@@ -44,17 +48,22 @@ export async function POST(request: Request) {
       case 'client':
         baseRedirectUrl = 'https://book.happyswims.life'
         break
+      case 'admin':
+        baseRedirectUrl = 'https://admin.happyswims.life'
+        break
       default:
         baseRedirectUrl = 'https://happyswims.life'
     }
 
-    const redirectTo = `${baseRedirectUrl}/reset-password`
-    console.log('API Route: Using redirect URL:', redirectTo)
+    const redirectTo = `${baseRedirectUrl}/reset-password#access_token=\${SUPABASE_AUTH_TOKEN}`
+        return redirectTo
+      }
+    console.log('API Route: Using redirect URL:', getURL())
 
     try {
       console.log('API Route: Calling Supabase resetPasswordForEmail...')
       const { data, error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-        redirectTo
+        redirectTo: getURL()
       })
 
       console.log('API Route: Supabase response:', { 
@@ -73,7 +82,7 @@ export async function POST(request: Request) {
       console.log('API Route: Successfully sent reset email')
       return Response.json({ 
         message: 'Password reset email sent successfully',
-        debug: { redirectTo }
+        debug: { redirectTo: getURL() }
       })
     } catch (supabaseError: any) {
       console.error('API Route: Supabase exception:', supabaseError)
