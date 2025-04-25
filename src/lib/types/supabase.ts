@@ -123,6 +123,22 @@ export type Database = {
           status?: string
         }
       }
+      student: {
+        Row: {
+          id: string
+          created_at: string
+          client_id: string
+          first_name: string
+          birthdate: string
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          client_id: string
+          first_name: string
+          birthdate: string
+        }
+      }
     }
   }
 }
@@ -132,12 +148,14 @@ export type Instructor = Database['public']['Tables']['instructor']['Row']
 export type Address = Database['public']['Tables']['address']['Row']
 export type Availability = Database['public']['Tables']['availability']['Row']
 export type Booking = Database['public']['Tables']['booking']['Row']
+export type Student = Database['public']['Tables']['student']['Row']
 
 export type ClientInsert = Database['public']['Tables']['client']['Insert']
 export type InstructorInsert = Database['public']['Tables']['instructor']['Insert']
 export type AddressInsert = Database['public']['Tables']['address']['Insert']
 export type AvailabilityInsert = Database['public']['Tables']['availability']['Insert']
 export type BookingInsert = Database['public']['Tables']['booking']['Insert']
+export type StudentInsert = Database['public']['Tables']['student']['Insert']
 
 export type BookingWithRelations = Booking & {
   client: Pick<Client, 'first_name' | 'last_name'>

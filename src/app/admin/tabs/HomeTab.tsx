@@ -11,52 +11,40 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import BookingCreateModal from '@/components/modals/BookingCreateModal'
 import ClientCreateModal from '@/components/modals/ClientCreateModal'
 import InstructorCreateModal from '@/components/modals/InstructorCreateModal'
-import { Address, Instructor, Client, Availability, Booking } from '@/lib/types/supabase'
+import { useAllData, useClients, useInstructors, useAddresses, useBookings, useAvailabilities } from '@/data/DataContext'
 
-interface HomeTabProps {
-  users: any[]
-  clients: Client[]
-  instructors: Instructor[]
-  addresses: Address[]
-  bookings: Booking[]
-  availabilities: Availability[]
-  fetchData: () => Promise<void>
-}
+export default function HomeTab() {
+  const { data: clients, loading: clientsLoading } = useClients();
+  const { data: instructors, loading: instructorsLoading } = useInstructors();
+  const { data: addresses, loading: addressesLoading } = useAddresses();
+  const { data: bookings, loading: bookingsLoading } = useBookings();
+  const { data: availabilities, loading: availabilitiesLoading } = useAvailabilities();
+  const { fetchAllData } = useAllData();
 
-export default function HomeTab({ 
-  users, 
-  clients, 
-  instructors, 
-  addresses, 
-  bookings,
-  availabilities,
-  fetchData
-}: HomeTabProps) {
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [showClientModal, setShowClientModal] = useState(false)
   const [showInstructorModal, setShowInstructorModal] = useState(false)
 
-  // Log initial props
+  // Load initial data
   useEffect(() => {
-    console.log('HomeTab Props:', {
-      users: users.length,
-      clients: clients.length,
-      instructors: instructors.length,
-      bookings: bookings.length,
-      availabilities: availabilities.length
-    })
-  }, [users, clients, instructors, bookings, availabilities])
+    if (
+      clients.length === 0 && 
+      instructors.length === 0 && 
+      addresses.length === 0 && 
+      bookings.length === 0 && 
+      availabilities.length === 0
+    ) {
+      fetchAllData();
+    }
+  }, [fetchAllData, clients.length, instructors.length, addresses.length, bookings.length, availabilities.length]);
 
   // Function to combine bookings and availabilities into calendar events
   const getCalendarEvents = () => {
-    console.log('Getting calendar events. Selected user:', selectedUser)
-
     const bookingEvents = selectedUser 
       ? bookings
           .filter(booking => {
             const matchingClient = clients.find(client => client.id === selectedUser)
-            console.log('Filtering bookings for client:', matchingClient?.id)
             return booking.client_id === matchingClient?.id
           })
           .map(booking => ({
@@ -154,30 +142,25 @@ export default function HomeTab({
       }
     });
 
-    const combinedEvents = [...bookingEvents, ...availabilityEvents];
-    console.log('Calendar Events:', {
-      bookings: bookingEvents.length,
-      availabilities: availabilityEvents.length,
-      total: combinedEvents.length
-    })
-
-    return combinedEvents;
+    return [...bookingEvents, ...availabilityEvents];
   };
+
+  // Show loading state
+  if (clientsLoading || instructorsLoading || addressesLoading || bookingsLoading || availabilitiesLoading) {
+    return <div>Loading data...</div>;
+  }
 
   return (
     <div style={{ display: 'flex', gap: '2rem' }}>
       <div style={{ width: '250px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <h2>Users</h2>
         <div style={{ marginTop: '1rem' }}>
-          <Select onValueChange={(value) => {
-            console.log('User selection changed:', value)
-            setSelectedUser(value)
-          }}>
+          <Select onValueChange={(value) => setSelectedUser(value)}>
             <SelectTrigger>
               <SelectValue placeholder="Select a user" />
             </SelectTrigger>
             <SelectContent>
-              {users.map(user => (
+              {clients.map(user => (
                 <SelectItem key={user.id} value={user.id}>
                   {user.first_name} {user.last_name} (client)
                 </SelectItem>
@@ -185,18 +168,9 @@ export default function HomeTab({
             </SelectContent>
           </Select> 
         </div>
-        <Button onClick={() => {
-          console.log('Opening booking modal')
-          setShowBookingModal(true)
-        }}>New Booking</Button>
-        <Button onClick={() => {
-          console.log('Opening client modal')
-          setShowClientModal(true)
-        }}>New Client</Button>
-        <Button onClick={() => {
-          console.log('Opening instructor modal')
-          setShowInstructorModal(true)
-        }}>New Instructor</Button>
+        <Button onClick={() => setShowBookingModal(true)}>New Booking</Button>
+        <Button onClick={() => setShowClientModal(true)}>New Client</Button>
+        <Button onClick={() => setShowInstructorModal(true)}>New Instructor</Button>
       </div>
 
       <div style={{ flex: 1 }}>
@@ -211,21 +185,13 @@ export default function HomeTab({
           events={getCalendarEvents()}
           height="80vh"
           firstDay={1}
-          eventDidMount={(info) => {
-            console.log('Event mounted:', {
-              id: info.event.id,
-              title: info.event.title,
-              start: info.event.start,
-              end: info.event.end
-            })
-          }}
         />
       </div>
 
       <BookingCreateModal
+        availabilities={availabilities}
         isOpen={showBookingModal}
         onClose={() => {
-          console.log('Closing booking modal')
           setShowBookingModal(false)
         }}
         instructors={instructors}
@@ -236,16 +202,16 @@ export default function HomeTab({
       <ClientCreateModal
         isOpen={showClientModal}
         onClose={() => {
-          console.log('Closing client modal')
           setShowClientModal(false)
+          fetchAllData(); // Refresh data after adding a client
         }}
       />
 
       <InstructorCreateModal
         isOpen={showInstructorModal}
         onClose={() => {
-          console.log('Closing instructor modal')
           setShowInstructorModal(false)
+          fetchAllData(); // Refresh data after adding an instructor
         }}
       />
     </div>

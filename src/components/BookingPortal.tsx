@@ -1,105 +1,420 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   useAddresses,
   useClients,
   useInstructors,
   useAvailabilities,
   useBookings,
+  useStudents,
 } from '@/data/DataContext';
+import { calculateRealAvailability, RealAvailability } from '@/utils/availability';
+import CreateBookingCalendar from './CreateBookingCalendar';
+import PoolAddressSelect from './PoolAddressSelect';
+import StudentManagement from './StudentManagement';
+import TimeSelect from './TimeSelect';
+import { Student } from '@/lib/types/supabase';
 
-import styles from './BookingPortal.module.css';
-import { DataCalendar, DataList, DataMap, DataSearch } from '@/data/DataComponents';
+type StudentWithSelection = Student & {
+  selected: boolean;
+};
 
-const DataSection = ({ title, data, loading, error }: {
-  title: string;
-  data: any[];
-  loading: boolean;
-  error: Error | null;
-}) => (
-  <div className={styles.section}>
-    <h2>{title}</h2>
-    {loading && <div className={styles.loading}>Loading {title.toLowerCase()}...</div>}
-    {error && <div className={styles.error}>Error: {error.message}</div>}
-    {!loading && !error && (
-      <>
-        <div className={styles.count}>Count: {data.length}</div>
-        <pre className={styles.data}>
-          {JSON.stringify(data, null, 2)}
-        </pre>
-      </>
-    )}
-  </div>
-);
+interface BookingFormState {
+  // Step 1: Pool Selection
+  poolAddressId: string;
+  
+  // Step 2: Student Management
+  students: StudentWithSelection[];
+  
+  // Step 3: Time Selection
+  startTime: string;
+  duration: number;
+  
+  // Step 4: Week & Instructor Selection
+  selectedWeek: Date | null;
+  instructorId: string;
+  clientId: string;
+}
 
-const BookingPortal: React.FC = () => {
+const initialFormState: BookingFormState = {
+  poolAddressId: '',
+  students: [],
+  startTime: '',
+  duration: 0,
+  selectedWeek: null,
+  instructorId: '',
+  clientId: ''
+};
+
+interface BookingPortalProps {
+  clientId?: string;
+}
+
+export default function BookingPortal({ clientId }: BookingPortalProps) {
+  const [formState, setFormState] = useState<BookingFormState>({
+    ...initialFormState,
+    clientId: clientId || ''
+  });
+  
+  // Data context hooks
   const addresses = useAddresses();
   const clients = useClients();
   const instructors = useInstructors();
   const availabilities = useAvailabilities();
   const bookings = useBookings();
+  const students = useStudents();
+  
+  const [realAvailability, setRealAvailability] = useState<RealAvailability>({});
 
+  // Load initial data
   useEffect(() => {
-    // Load first page of each data type
-    const fetchData = async () => {
-      try {
-        await Promise.all([
-          addresses.fetchAddresses(1, 50),
-          clients.fetchClients(1, 50),
-          instructors.fetchInstructors(1, 50),
-          availabilities.fetchAvailabilities(1, 50),
-          bookings.fetchBookings(1, 50)
-        ]);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
+    const pageSize = 1000;
+    const loadData = async () => {
+      await Promise.all([
+        addresses.fetchAddresses(1, pageSize),
+        clients.fetchClients(1, pageSize),
+        instructors.fetchInstructors(1, pageSize),
+        availabilities.fetchAvailabilities(1, pageSize),
+        bookings.fetchBookings(1, pageSize)
+      ]);
     };
+    loadData();
+  }, [addresses.fetchAddresses, clients.fetchClients, instructors.fetchInstructors, 
+      availabilities.fetchAvailabilities, bookings.fetchBookings]);
 
-    fetchData();
-  }, []);
+  // Calculate real availability when dependencies change
+  useEffect(() => {
+    if (!formState.selectedWeek || instructors.data.length === 0) {
+      return;
+    }
 
-  const isLoading = 
-    addresses.loading || 
-    clients.loading || 
-    instructors.loading || 
-    availabilities.loading || 
-    bookings.loading;
+    try {
+      // Calculate start and end of the selected week
+      const weekStart = new Date(formState.selectedWeek);
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
 
-  const hasError = 
-    addresses.error || 
-    clients.error || 
-    instructors.error || 
-    availabilities.error || 
-    bookings.error;
+      // Calculate real availability for all instructors
+      const availability = calculateRealAvailability(
+        instructors.data.map(i => i.id),
+        availabilities.data,
+        bookings.data,
+        weekStart,
+        weekEnd
+      );
+
+      setRealAvailability(availability);
+    } catch (err) {
+      console.error('BookingPortal - Error calculating availability:', err);
+    }
+  }, [
+    formState.selectedWeek,
+    instructors.data,
+    availabilities.data,
+    bookings.data
+  ]);
+
+  // Handle week selection
+  const handleWeekSelect = (weekStart: Date) => {
+    try {
+      // Validate date
+      if (!(weekStart instanceof Date) || isNaN(weekStart.getTime())) {
+        throw new Error('Invalid week selection');
+      }
+
+      // Ensure week starts on Monday
+      const day = weekStart.getDay();
+      const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(weekStart.setDate(diff));
+      monday.setHours(0, 0, 0, 0);
+
+      setFormState(prev => ({
+        ...prev,
+        selectedWeek: monday,
+        // Clear instructor selection when week changes
+        instructorId: ''
+      }));
+    } catch (err) {
+      console.error('BookingPortal - Error handling week selection:', err);
+    }
+  };
 
   return (
-    <div className={styles.container}>
-      <DataSearch />
-      
-      {hasError && (
-        <div className={styles.error}>
-          Error loading data. Please try again later.
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className={styles.loading}>
-          Loading data...
-        </div>
-      ) : (
-        <>
-          <DataMap />
-          <DataList />
-          <DataCalendar 
-            availabilities={availabilities.data} 
-            bookings={bookings.data}
-            height="600px"
+    <div style={{
+      padding: '2rem',
+      maxWidth: '1200px',
+      margin: '0 auto'
+    }}>
+      <div style={{
+        display: 'grid',
+        gap: '2rem'
+      }}>
+        {/* Step 1: Pool Selection */}
+        <section style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          padding: '1.5rem',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          gridColumn: 'span 2'
+        }}>
+          <h2 style={{
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '1rem'
+          }}>
+            Select Pool Location
+          </h2>
+          <PoolAddressSelect
+            addresses={addresses.data}
+            selectedAddressId={formState.poolAddressId}
+            onAddressSelect={(addressId) => {
+              setFormState(prev => ({
+                ...prev,
+                poolAddressId: addressId
+              }));
+            }}
           />
-        </>
-      )}
+        </section>
+
+        {/* Step 2: Student Management */}
+        <section style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          padding: '1.5rem',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <h2 style={{
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '1rem'
+          }}>
+            Select Students
+          </h2>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '8px',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+            padding: '1.5rem'
+          }}>
+            <StudentManagement
+              students={students.data}
+              selectedStudents={formState.students}
+              onStudentsChange={(students) => {
+                setFormState(prev => ({
+                  ...prev,
+                  students,
+                  duration: students.filter(s => s.selected).length * 35
+                }));
+              }}
+            />
+            {formState.students.filter(s => s.selected).length > 0 && (
+              <div style={{
+                marginTop: '1rem',
+                padding: '0.75rem',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '6px',
+                color: '#1f2937',
+                fontSize: '0.9rem'
+              }}>
+                {formState.students.filter(s => s.selected).length} student{formState.students.filter(s => s.selected).length !== 1 ? 's' : ''} selected
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Step 3: Time Selection */}
+        <section style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          padding: '1.5rem',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <h2 style={{
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '1rem'
+          }}>
+            Select Start Time
+          </h2>
+          <TimeSelect
+            selectedTime={formState.startTime}
+            onTimeSelect={(time) => {
+              setFormState(prev => ({
+                ...prev,
+                startTime: time
+              }));
+            }}
+            duration={formState.duration}
+            disabled={formState.duration === 0}
+          />
+          {formState.duration > 0 && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '0.75rem',
+              backgroundColor: '#f3f4f6',
+              borderRadius: '6px',
+              color: '#1f2937',
+              fontSize: '0.9rem'
+            }}>
+              Lesson Duration: {formState.duration} minutes
+            </div>
+          )}
+        </section>
+
+        {/* Step 4: Week & Instructor Selection */}
+        <section style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          padding: '1.5rem',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          gridColumn: 'span 2'
+        }}>
+          <h2 style={{
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '1rem'
+          }}>
+            Select Week & Instructor
+          </h2>
+          <div style={{
+            gap: '2rem',
+          }}>
+            {/* Calendar Section */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}>
+              <div style={{
+                backgroundColor: '#f9fafb',
+                border: '1px solid #e5e7eb',
+                borderRadius: '6px',
+                padding: '1rem'
+              }}>
+                <CreateBookingCalendar
+                  realAvailabilities={realAvailability}
+                  selectedWeek={formState.selectedWeek}
+                  onWeekSelect={handleWeekSelect}
+                />
+              </div>
+              {formState.selectedWeek && (
+                <div style={{
+                  padding: '0.75rem',
+                  backgroundColor: '#f0f9ff',
+                  border: '1px solid #bae6fd',
+                  borderRadius: '6px',
+                  color: '#0369a1',
+                  fontSize: '0.9rem'
+                }}>
+                  Selected Week: {formState.selectedWeek.toLocaleDateString()} - {new Date(formState.selectedWeek.getTime() + 6 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                </div>
+              )}
+            </div>
+
+            {/* Instructor List Section */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}>
+              <div style={{
+                fontSize: '0.9rem',
+                color: '#4b5563',
+                marginBottom: '0.5rem'
+              }}>
+                Available Instructors
+              </div>
+              <div style={{
+                backgroundColor: '#f9fafb',
+                border: '1px solid #e5e7eb',
+                borderRadius: '6px',
+                overflow: 'hidden'
+              }}>
+                {instructors.data.length > 0 ? (
+                  <div style={{
+                    maxHeight: '300px',
+                    overflowY: 'auto'
+                  }}>
+                    {instructors.data.map(instructor => {
+                      const isAvailable = realAvailability[instructor.id]?.some(slot => {
+                        if (!formState.selectedWeek) return false;
+                        const slotDate = new Date(slot.start);
+                        return slotDate >= formState.selectedWeek && 
+                               slotDate <= new Date(formState.selectedWeek.getTime() + 6 * 24 * 60 * 60 * 1000);
+                      });
+
+                      return (
+                        <div
+                          key={instructor.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '1rem',
+                            borderBottom: '1px solid #e5e7eb',
+                            backgroundColor: formState.instructorId === instructor.id ? '#eff6ff' : '#ffffff',
+                            opacity: isAvailable ? 1 : 0.5,
+                            cursor: isAvailable ? 'pointer' : 'not-allowed',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onClick={() => {
+                            if (isAvailable) {
+                              setFormState(prev => ({
+                                ...prev,
+                                instructorId: instructor.id
+                              }));
+                            }
+                          }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <div style={{
+                              fontWeight: 500,
+                              color: '#1f2937'
+                            }}>
+                              {instructor.first_name} {instructor.last_name}
+                            </div>
+                            <div style={{
+                              fontSize: '0.875rem',
+                              color: '#6b7280',
+                              marginTop: '0.25rem'
+                            }}>
+                              {isAvailable ? 'Available this week' : 'Not available this week'}
+                            </div>
+                          </div>
+                          {formState.instructorId === instructor.id && (
+                            <div style={{
+                              color: '#3b82f6'
+                            }}>
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fill="currentColor"/>
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '2rem',
+                    textAlign: 'center',
+                    color: '#6b7280'
+                  }}>
+                    No instructors available
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   );
-};
-
-export default BookingPortal;
+}

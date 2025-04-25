@@ -43,16 +43,24 @@ interface DataState {
     loading: boolean;
     error: Error | null;
   };
+  students: {
+    data: Database['public']['Tables']['student']['Row'][];
+    pagination: PaginationState;
+    loading: boolean;
+    error: Error | null;
+  };
 }
 
 // Define context type
 interface DataContextType {
   state: DataState;
+  fetchAllData: () => Promise<void>;
   fetchAddresses: (page: number, pageSize: number) => Promise<void>;
   fetchClients: (page: number, pageSize: number) => Promise<void>;
   fetchInstructors: (page: number, pageSize: number) => Promise<void>;
   fetchAvailabilities: (page: number, pageSize: number) => Promise<void>;
   fetchBookings: (page: number, pageSize: number) => Promise<void>;
+  fetchStudents: (page: number, pageSize: number) => Promise<void>;
 }
 
 const initialPaginationState: PaginationState = {
@@ -67,6 +75,7 @@ const initialState: DataState = {
   instructors: { data: [], pagination: { ...initialPaginationState }, loading: false, error: null },
   availabilities: { data: [], pagination: { ...initialPaginationState }, loading: false, error: null },
   bookings: { data: [], pagination: { ...initialPaginationState }, loading: false, error: null },
+  students: { data: [], pagination: { ...initialPaginationState }, loading: false, error: null },
 };
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -80,7 +89,81 @@ const supabase = createClient<Database>(
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<DataState>(initialState);
 
-  const createFetchFunction = <T extends keyof DataState>(
+  const fetchAllData = useCallback(async () => {
+    // Set loading state for all tables
+    setState(prev => ({
+      ...prev,
+      addresses: { ...prev.addresses, loading: true, error: null },
+      clients: { ...prev.clients, loading: true, error: null },
+      instructors: { ...prev.instructors, loading: true, error: null },
+      availabilities: { ...prev.availabilities, loading: true, error: null },
+      bookings: { ...prev.bookings, loading: true, error: null },
+      students: { ...prev.students, loading: true, error: null },
+    }));
+
+    try {
+      const [clientData, instructorData, addressData, bookingData, availabilityData, studentData] = await Promise.all([
+        supabase.from('client').select('*'),
+        supabase.from('instructor').select('*'),
+        supabase.from('address').select('*'),
+        supabase.from('booking').select('*'),
+        supabase.from('availability').select('*'),
+        supabase.from('student').select('*')
+      ]);
+
+      setState(prev => ({
+        ...prev,
+        addresses: {
+          data: addressData.data || [],
+          pagination: { ...prev.addresses.pagination, total: addressData.data?.length || 0 },
+          loading: false,
+          error: addressData.error
+        },
+        clients: {
+          data: clientData.data || [],
+          pagination: { ...prev.clients.pagination, total: clientData.data?.length || 0 },
+          loading: false,
+          error: clientData.error
+        },
+        instructors: {
+          data: instructorData.data || [],
+          pagination: { ...prev.instructors.pagination, total: instructorData.data?.length || 0 },
+          loading: false,
+          error: instructorData.error
+        },
+        availabilities: {
+          data: availabilityData.data || [],
+          pagination: { ...prev.availabilities.pagination, total: availabilityData.data?.length || 0 },
+          loading: false,
+          error: availabilityData.error
+        },
+        bookings: {
+          data: bookingData.data || [],
+          pagination: { ...prev.bookings.pagination, total: bookingData.data?.length || 0 },
+          loading: false,
+          error: bookingData.error
+        },
+        students: {
+          data: studentData.data || [],
+          pagination: { ...prev.students.pagination, total: studentData.data?.length || 0 },
+          loading: false,
+          error: studentData.error
+        }
+      }));
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        addresses: { ...prev.addresses, loading: false, error: error as Error },
+        clients: { ...prev.clients, loading: false, error: error as Error },
+        instructors: { ...prev.instructors, loading: false, error: error as Error },
+        availabilities: { ...prev.availabilities, loading: false, error: error as Error },
+        bookings: { ...prev.bookings, loading: false, error: error as Error },
+        students: { ...prev.students, loading: false, error: error as Error }
+      }));
+    }
+  }, []);
+
+  const createFetchFunction = useCallback(<T extends keyof DataState>(
     tableName: T,
     supabaseTable: string
   ) => {
@@ -126,21 +209,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }));
       }
     };
-  };
+  }, []);
 
-  const fetchAddresses = createFetchFunction('addresses', 'address');
-  const fetchClients = createFetchFunction('clients', 'client');
-  const fetchInstructors = createFetchFunction('instructors', 'instructor');
-  const fetchAvailabilities = createFetchFunction('availabilities', 'availability');
-  const fetchBookings = createFetchFunction('bookings', 'booking');
+  const fetchAddresses = useCallback(createFetchFunction('addresses', 'address'), [createFetchFunction]);
+  const fetchClients = useCallback(createFetchFunction('clients', 'client'), [createFetchFunction]);
+  const fetchInstructors = useCallback(createFetchFunction('instructors', 'instructor'), [createFetchFunction]);
+  const fetchAvailabilities = useCallback(createFetchFunction('availabilities', 'availability'), [createFetchFunction]);
+  const fetchBookings = useCallback(createFetchFunction('bookings', 'booking'), [createFetchFunction]);
+  const fetchStudents = useCallback(createFetchFunction('students', 'student'), [createFetchFunction]);
 
   const value = {
     state,
+    fetchAllData,
     fetchAddresses,
     fetchClients,
     fetchInstructors,
     fetchAvailabilities,
     fetchBookings,
+    fetchStudents,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
@@ -163,7 +249,9 @@ export const useAddresses = () => {
 
 export const useClients = () => {
   const { state, fetchClients } = useData();
-  return { ...state.clients, fetchClients };
+  // Ensure data is always an array even if undefined
+  const safeData = state.clients.data || [];
+  return { ...state.clients, data: safeData, fetchClients };
 };
 
 export const useInstructors = () => {
@@ -179,6 +267,17 @@ export const useAvailabilities = () => {
 export const useBookings = () => {
   const { state, fetchBookings } = useData();
   return { ...state.bookings, fetchBookings };
+};
+
+export const useStudents = () => {
+  const { state, fetchStudents } = useData();
+  return { ...state.students, fetchStudents };
+};
+
+// Add a new custom hook for fetching all data
+export const useAllData = () => {
+  const { state, fetchAllData } = useData();
+  return { state, fetchAllData };
 };
 
 // Export the provider and hooks

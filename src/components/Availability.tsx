@@ -74,7 +74,11 @@ const COLORS = [
   '#FFA726'  // Orange
 ];
 
-export default function InstructorDashboard() {
+interface AvailabilityProps {
+  instructorId?: string;
+}
+
+export default function Availability({ instructorId }: AvailabilityProps) {
   const [timeRanges, setTimeRanges] = useState<TimeRange[]>([{
     id: '1',
     splits: [{
@@ -88,49 +92,17 @@ export default function InstructorDashboard() {
   const [patterns, setPatterns] = useState<AvailabilityPattern[]>([]);
   const [selectedTimeRange, setSelectedTimeRange] = useState<string>('1');
   const [selectedType, setSelectedType] = useState<'days' | 'weeks' | 'months' | 'weekends'>('days');
-  const [instructorId, setInstructorId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isEdited, setIsEdited] = useState(false);
 
-  // Fetch instructor ID on component mount
+  // Load existing availability when instructorId changes
   useEffect(() => {
-    async function fetchInstructorId() {
-      try {
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          setSaveError('You must be logged in to manage availability');
-          return;
-        }
-        
-        // Get instructor ID for the current user
-        const { data: instructorData, error: instructorError } = await supabase
-          .from('instructor')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (instructorError) {
-          console.error('Error fetching instructor:', instructorError);
-          setSaveError('Failed to find instructor profile');
-          return;
-        }
-        
-        setInstructorId(instructorData.id);
-        
-        // Load existing availability patterns
-        await loadAvailability(instructorData.id);
-      } catch (err) {
-        console.error('Error in initialization:', err);
-        setSaveError('Failed to initialize availability');
-      }
+    if (instructorId) {
+      loadAvailability(instructorId);
     }
-    
-    fetchInstructorId();
-  }, []);
+  }, [instructorId]);
 
   // Load existing availability from Supabase
   const loadAvailability = async (instructorId: string) => {

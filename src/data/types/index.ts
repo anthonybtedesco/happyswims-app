@@ -55,6 +55,14 @@ export interface Booking {
   status?: string;
 }
 
+export interface Student {
+  id: string;
+  created_at: string;
+  client_id: string;
+  first_name: string;
+  birthdate: string;
+}
+
 export interface BookingWithRelations extends Booking {
   client: Pick<Client, 'first_name' | 'last_name'>;
   instructor: Pick<Instructor, 'first_name' | 'last_name'>;
@@ -69,6 +77,7 @@ export interface CalendarEvent {
 
 // Insert types for creating new records
 export type AddressInsert = Omit<Address, 'id' | 'created_at'>;
+export type StudentInsert = Omit<Student, 'id' | 'created_at'>;``
 export type ClientInsert = Omit<Client, 'id' | 'created_at'>;
 export type InstructorInsert = Omit<Instructor, 'id' | 'created_at'>;
 export type AvailabilityInsert = Omit<Availability, 'id' | 'created_at'>;

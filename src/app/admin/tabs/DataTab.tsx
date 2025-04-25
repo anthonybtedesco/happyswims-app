@@ -2,36 +2,22 @@
 
 import React, { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Address, Instructor, Client, Availability } from '@/lib/types/supabase'
 import MapComponent from '@/lib/mapbox/MapComponent'
 import Calendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { EventSourceInput } from '@fullcalendar/core'
+import { useClients, useInstructors, useAddresses, useBookings, useAvailabilities, useAllData } from '@/data/DataContext'
 
-interface DataTabProps {
-  clients: Client[]
-  instructors: Instructor[]
-  addresses: Address[]
-  bookings: any[]
-  availabilities: Availability[]
-  fetchData: () => Promise<void>
-}
+export default function DataTab() {
+  const { data: clients, loading: clientsLoading } = useClients();
+  const { data: instructors, loading: instructorsLoading } = useInstructors();
+  const { data: addresses, loading: addressesLoading } = useAddresses();
+  const { data: bookings, loading: bookingsLoading } = useBookings();
+  const { data: availabilities, loading: availabilitiesLoading } = useAvailabilities();
+  const { fetchAllData } = useAllData();
 
-interface UserWithEmail {
-  id: string;
-  email: string;
-}
-
-export default function DataTab({
-  clients,
-  instructors,
-  addresses,
-  bookings,
-  availabilities,
-  fetchData
-}: DataTabProps) {
   const [selectedTable, setSelectedTable] = useState('clients')
   const [editingCell, setEditingCell] = useState<{rowId: string, column: string, value: string} | null>(null)
   const [userEmails, setUserEmails] = useState<Record<string, string>>({})
@@ -39,6 +25,19 @@ export default function DataTab({
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(true)
   const [selectedRows, setSelectedRows] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Load initial data
+  useEffect(() => {
+    if (
+      clients.length === 0 && 
+      instructors.length === 0 && 
+      addresses.length === 0 && 
+      bookings.length === 0 && 
+      availabilities.length === 0
+    ) {
+      fetchAllData();
+    }
+  }, [fetchAllData, clients.length, instructors.length, addresses.length, bookings.length, availabilities.length]);
 
   useEffect(() => {
     const fetchUserEmails = async () => {
@@ -89,12 +88,17 @@ export default function DataTab({
 
       if (error) throw error
       
-      fetchData()
+      fetchAllData()
     } catch (err: any) {
       console.error('Error updating cell:', err)
     }
 
     setEditingCell(null)
+  }
+
+  // Show loading state
+  if (clientsLoading || instructorsLoading || addressesLoading || bookingsLoading || availabilitiesLoading) {
+    return <div>Loading data...</div>;
   }
 
   const handleRowSelect = (rowId: string) => {
