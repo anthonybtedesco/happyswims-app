@@ -15,6 +15,7 @@ export async function middleware(request: NextRequest) {
 
   const hostname = request.headers.get('host')
   const subdomain = hostname?.split('.')[0]
+  const currentUrl = request.url
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -48,57 +49,56 @@ export async function middleware(request: NextRequest) {
 
   const isAuthPage = request.nextUrl.pathname.match(/^\/(?:login|signup|reset-password)$/)
 
-  if (!user) {
+  // If user is not authenticated and trying to access a protected route
+  if (!user && !isAuthPage) {
+    // Keep them on the same subdomain's login page
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  if (isAuthPage) {
+  // If user is authenticated and on an auth page
+  if (user && isAuthPage) {
     const userRole = user.user_metadata.role
-    console.log("User Role: ",userRole)
-    let redirectUrl = '/'
-    
+    let targetUrl = 'https://book.happyswims.life' // default
+
     if (userRole === 'admin') {
-      return NextResponse.redirect('https://admin.happyswims.life')
+      targetUrl = 'https://admin.happyswims.life'
+    } else if (userRole === 'instructor') {
+      targetUrl = 'https://instructor.happyswims.life'
     }
-    
-    switch (userRole) {
-      case 'instructor':
-        redirectUrl = 'https://instructor.happyswims.life'
-        break
-      case 'client':
-        redirectUrl = 'https://book.happyswims.life'
-        break
+
+    // Only redirect if we're not already on the target URL
+    if (!currentUrl.startsWith(targetUrl)) {
+      return NextResponse.redirect(targetUrl)
     }
-    
-    return NextResponse.redirect(redirectUrl)
   }
 
-  const userRole = user.user_metadata.role
+  // Handle subdomain access control
+  if (user) {
+    const userRole = user.user_metadata.role
 
-  if (subdomain === 'admin' && userRole !== 'admin' && request.url !== 'https://book.happyswims.life') {
-    return NextResponse.redirect('https://book.happyswims.life')
-  }
+    // Prevent access to wrong subdomains
+    if (subdomain === 'admin' && userRole !== 'admin') {
+      return NextResponse.redirect('https://book.happyswims.life')
+    }
 
-  if (subdomain === 'instructor' && userRole !== 'instructor' && request.url !== 'https://instructor.happyswims.life') {
-    return NextResponse.redirect('https://instructor.happyswims.life')
-  }
+    if (subdomain === 'instructor' && userRole !== 'instructor') {
+      return NextResponse.redirect('https://book.happyswims.life')
+    }
 
-  if (subdomain === 'book' && userRole === 'client' && request.url !== 'https://book.happyswims.life') {
-    return NextResponse.redirect('https://book.happyswims.life')
-  }
+    // Handle subdomain rewrites
+    if (subdomain === 'admin') {
+      return NextResponse.rewrite(new URL('/admin' + request.nextUrl.pathname, request.url))
+    }
 
-  if (subdomain === 'admin') {
-    return NextResponse.rewrite(new URL('/admin' + request.nextUrl.pathname, request.url))
-  }
+    if (subdomain === 'instructor') {
+      return NextResponse.rewrite(new URL('/instructor' + request.nextUrl.pathname, request.url))
+    }
 
-  if (subdomain === 'instructor') {
-    return NextResponse.rewrite(new URL('/instructor' + request.nextUrl.pathname, request.url))
-  }
-
-  if (subdomain === 'book') {
-    return NextResponse.rewrite(new URL('/book' + request.nextUrl.pathname, request.url))
+    if (subdomain === 'book') {
+      return NextResponse.rewrite(new URL('/book' + request.nextUrl.pathname, request.url))
+    }
   }
 
   return response

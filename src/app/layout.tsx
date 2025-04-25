@@ -4,6 +4,7 @@ import "./globals.css";
 import { colors } from "@/lib/colors";
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@/lib/debug/environment'
+import GoogleApiScript from '@/components/GoogleApiScript'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,6 +28,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <GoogleApiScript />
+      </head>
       <body 
         style={{
           background: colors.common.background,

@@ -6,9 +6,10 @@ import { colors, buttonVariants } from '@/lib/colors'
 import { MapComponent, calculateMatrix, formatDuration } from '@/lib/mapbox'
 import '@/styles/map.css'
 import AutofillAddress from '@/lib/mapbox/AutofillAddress'
-import { Address, Instructor, Client, BookingInsert } from '@/lib/types/supabase'
-import InstructorDrivetimes from '../InstructorDrivetimes'
+import { Address, Instructor, Client, BookingInsert, Availability } from '@/lib/types/supabase'
+import InstructorList from '../InstructorList'
 import { geocodeNewAddress } from '@/lib/geocoding'
+import DateTimePicker from '@/components/DateTimePicker'
 
 // Extended instructor type that includes travel time
 type InstructorWithTravelTime = Instructor & {
@@ -22,9 +23,10 @@ type BookingCreateModalProps = {
   instructors: Instructor[]
   clients: Client[]
   addresses: Address[]
+  availabilities: Availability[]
 }
 
-export default function BookingCreateModal({ isOpen, onClose, instructors, clients, addresses }: BookingCreateModalProps) {
+export default function BookingCreateModal({ isOpen, onClose, instructors, clients, addresses, availabilities }: BookingCreateModalProps) {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [showAddressForm, setShowAddressForm] = useState(false)
@@ -553,37 +555,13 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
 
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.text.secondary }}>
-                Instructor
-              </label>
-              <InstructorDrivetimes
-                instructors={instructorsWithTravelTime}
-                selectedInstructorId={formData.instructor_id}
-                onInstructorSelect={(id) => {
-                  console.log("Selected instructor:", id);
-                  setFormData({ ...formData, instructor_id: id });
-                }}
-                poolAddressId={formData.pool_address_id}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.text.secondary }}>
                 Start Time
               </label>
-              <input
-                type="datetime-local"
-                value={formData.start_time}
-                onChange={(e) => {
-                  console.log("Selected start time:", e.target.value);
-                  setFormData({ ...formData, start_time: e.target.value });
-                }}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '6px',
-                  border: `1px solid ${colors.border.light}`,
-                  backgroundColor: colors.common.white
+              <DateTimePicker
+                selectedDateTime={formData.start_time}
+                onChange={(dateTime) => {
+                  console.log("Selected date and time:", dateTime);
+                  setFormData({ ...formData, start_time: dateTime });
                 }}
               />
             </div>
@@ -637,6 +615,25 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
               />
             </div>
           </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.text.secondary }}>
+                Instructor
+              </label>
+              <InstructorList
+                instructors={instructorsWithTravelTime}
+                availabilities={availabilities}
+                selectedInstructorId={formData.instructor_id}
+                onInstructorSelect={(id) => {
+                  console.log("Selected instructor:", id);
+                  setFormData({ ...formData, instructor_id: id });
+                }}
+                poolAddressId={formData.pool_address_id}
+                startDateTime={formData.start_time}
+                duration={formData.duration}
+                recurrenceWeeks={formData.recurrence_weeks}
+              />
+            </div>
+
 
           {error && (
             <div style={{
