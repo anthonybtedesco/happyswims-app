@@ -656,28 +656,66 @@ export default function InstructorDashboard() {
                 <div>
                   <label style={{ 
                     display: 'block', 
-                    marginBottom: '0.5rem' 
+                    marginBottom: '0.5rem',
+                    fontWeight: '500'
                   }}>
                     Select Time Range
                   </label>
-                  <select
-                    value={selectedTimeRange}
-                    onChange={(e) => setSelectedTimeRange(e.target.value)}
-                    style={{ 
-                      width: '100%', 
-                      padding: '0.5rem', 
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '0.375rem'
-                    }}
-                  >
-                    {timeRanges.map(range => (
-                      <option key={range.id} value={range.id}>
-                        {range.splits.map(split => 
-                          `${split.startTime} - ${split.endTime}`
-                        ).join(', ')}
-                      </option>
-                    ))}
-                  </select>
+                  <div style={{
+                    position: 'relative',
+                    width: '100%'
+                  }}>
+                    <select
+                      value={selectedTimeRange}
+                      onChange={(e) => setSelectedTimeRange(e.target.value)}
+                      style={{ 
+                        width: '100%', 
+                        padding: '0.75rem', 
+                        paddingLeft: '2.5rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '0.375rem',
+                        appearance: 'none',
+                        backgroundColor: colors.common.white,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {timeRanges.map(range => (
+                        <option key={range.id} value={range.id}>
+                          {range.splits.map(split => 
+                            `${split.startTime} - ${split.endTime}`
+                          ).join(', ')}
+                        </option>
+                      ))}
+                    </select>
+                    <div style={{
+                      position: 'absolute',
+                      left: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '1rem',
+                      height: '1rem',
+                      borderRadius: '0.25rem',
+                      backgroundColor: timeRanges.find(r => r.id === selectedTimeRange)?.color || COLORS[0]
+                    }} />
+                    <div style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none'
+                    }}>
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  </div>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: colors.text.secondary,
+                    marginTop: '0.5rem'
+                  }}>
+                    Select a time range before choosing dates on the calendar
+                  </p>
                 </div>
 
                 <div>
