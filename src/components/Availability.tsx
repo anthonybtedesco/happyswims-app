@@ -52,8 +52,26 @@ type InstructorAvailability = {
 }
 
 const COLORS = [
-  '#FF6B6B', '#4ECDC4', '#45B7D1', 
-  '#96CEB4', '#FFEEAD', '#D4A5A5'
+  '#FF6B6B', // Coral Red
+  '#4ECDC4', // Turquoise
+  '#45B7D1', // Sky Blue
+  '#96CEB4', // Sage Green
+  '#FFEEAD', // Cream Yellow
+  '#D4A5A5', // Dusty Rose
+  '#7986CB', // Cornflower Blue
+  '#9575CD', // Medium Purple
+  '#64B5F6', // Light Blue
+  '#4DB6AC', // Teal
+  '#81C784', // Light Green
+  '#DCE775', // Lime
+  '#FFD54F', // Amber
+  '#FF8A65', // Light Orange
+  '#A1887F', // Brown
+  '#90A4AE', // Blue Grey
+  '#F06292', // Pink
+  '#7E57C2', // Deep Purple
+  '#26A69A', // Teal Green
+  '#FFA726'  // Orange
 ];
 
 export default function InstructorDashboard() {
@@ -156,7 +174,7 @@ export default function InstructorDashboard() {
             
             timeRangeMap.set(timeRangeId, {
               id: timeRangeId,
-              color: item.color || COLORS[timeRangeMap.size % COLORS.length],
+              color: COLORS[timeRangeMap.size % COLORS.length],
               splits
             });
           }
@@ -208,20 +226,21 @@ export default function InstructorDashboard() {
         const timeRange = timeRanges.find(r => r.id === pattern.timeRangeId);
         if (!timeRange) continue;
         
-        const timeRangeStr = timeRange.splits.map(split => 
-          `${split.startTime}-${split.endTime}`
-        ).join(',');
-        
-        await supabase
-          .from('availability')
-          .insert({
-            id: pattern.id,
-            instructor_id: instructorId,
-            start_date: pattern.start,
-            end_date: pattern.end,
-            timerange: timeRangeStr,
-            color: timeRange.color
-          });
+        // Create a separate availability entry for each time split
+        for (const split of timeRange.splits) {
+          const timeRangeStr = `${split.startTime}-${split.endTime}`;
+          
+          await supabase
+            .from('availability')
+            .insert({
+              id: uuidv4(), // Generate a new ID for each availability entry
+              instructor_id: instructorId,
+              start_date: pattern.start,
+              end_date: pattern.end,
+              timerange: timeRangeStr,
+              color: timeRange.color
+            });
+        }
       }
       
       setSaveSuccess(true);
