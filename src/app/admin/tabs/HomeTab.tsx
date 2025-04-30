@@ -231,6 +231,7 @@ export default function HomeTab({
         instructors={instructors}
         clients={clients}
         addresses={addresses}
+        availabilities={availabilities}
       />
 
       <ClientCreateModal

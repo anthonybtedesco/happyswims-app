@@ -24,7 +24,9 @@ export async function POST(request: Request) {
     const emailMap: Record<string, string> = {}
     
     filteredUsers.forEach(user => {
-      emailMap[user.id] = user.email
+      if (user.email) {
+        emailMap[user.id] = user.email
+      }
     })
 
     return Response.json({ users: emailMap })
