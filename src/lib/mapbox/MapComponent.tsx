@@ -29,6 +29,7 @@ type MapComponentProps = {
   onAddressSelect?: (addressId: string) => void;
   selectedAddressId?: string;
   height?: string;
+  defaultMarkerColor?: string;
 };
 
 const MapComponent: React.FC<MapComponentProps> = ({
@@ -36,6 +37,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
   onAddressSelect,
   selectedAddressId,
   height = '300px',
+  defaultMarkerColor = '#4BB543',
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -93,6 +95,26 @@ const MapComponent: React.FC<MapComponentProps> = ({
     };
   }, []);
 
+  // Helper function to determine marker color based on address tags
+  function getMarkerColor(address: Address) {
+    // If address is selected, use a specific color
+    if (address.id === selectedAddressId) {
+      return '#0078FF';
+    }
+    
+    // If address has tags, use the first tag's color
+    if (address.address_tag && address.address_tag.length > 0) {
+      // Find the first tag with a color and use it
+      const tagWithColor = address.address_tag.find(tag => tag.tag && tag.tag.color);
+      if (tagWithColor && tagWithColor.tag.color) {
+        return tagWithColor.tag.color;
+      }
+    }
+    
+    // Default color if no tags or selected
+    return defaultMarkerColor;
+  }
+
   // Add markers when addresses or map changes
   useEffect(() => {
     if (!map.current || !mapLoaded || addresses.length === 0 || mapError) return;
@@ -117,18 +139,22 @@ const MapComponent: React.FC<MapComponentProps> = ({
       markerElement.style.width = '25px';
       markerElement.style.height = '25px';
       markerElement.style.borderRadius = '50%';
-      markerElement.style.backgroundColor = address.id === selectedAddressId ? '#0078FF' : '#4BB543';
+      markerElement.style.backgroundColor = getMarkerColor(address);
       markerElement.style.border = '2px solid white';
       markerElement.style.cursor = 'pointer';
 
       // Create popup with address info
       const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
         <div style="padding: 10px;">
-          <strong>Pool Address</strong>
           <p style="margin: 5px 0;">
             <strong>${address.address_line}</strong><br>
             ${address.city}, ${address.state} ${address.zip}
           </p>
+          ${address.address_tag && address.address_tag.length > 0 ? `
+            <p style="margin-top: 5px;">
+              <strong>Tags:</strong> ${address.address_tag.map(t => t.tag.name).join(', ')}
+            </p>
+          ` : ''}
         </div>
       `);
 
@@ -159,7 +185,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
         maxZoom: 15
       });
     }
-  }, [addresses, selectedAddressId, mapLoaded, onAddressSelect, mapError]);
+  }, [addresses, selectedAddressId, mapLoaded, onAddressSelect, mapError, defaultMarkerColor]);
 
   return (
     <div style={{ position: 'relative', height, width: '100%' }}>

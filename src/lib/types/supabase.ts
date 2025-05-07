@@ -127,11 +127,19 @@ export type Database = {
   }
 }
 
-export type Client = Database['public']['Tables']['client']['Row']
-export type Instructor = Database['public']['Tables']['instructor']['Row']
-export type Address = Database['public']['Tables']['address']['Row']
+export type Client = Database['public']['Tables']['client']['Row'] & {
+  client_tag?: Array<{tag: {id: string, name: string, color: string}, tagId: string}>
+}
+export type Instructor = Database['public']['Tables']['instructor']['Row'] & {
+  instructor_tag?: Array<{tag: {id: string, name: string, color: string}, tag_id: string}>
+}
+export type Address = Database['public']['Tables']['address']['Row'] & {
+  address_tag?: Array<{tag: {id: string, name: string, color: string}, tag_id: string}>
+}
 export type Availability = Database['public']['Tables']['availability']['Row']
-export type Booking = Database['public']['Tables']['booking']['Row']
+export type Booking = Database['public']['Tables']['booking']['Row'] & {
+  booking_tag?: Array<{tag: {id: string, name: string, color: string}, tag_id: string}>
+}
 
 export type ClientInsert = Database['public']['Tables']['client']['Insert']
 export type InstructorInsert = Database['public']['Tables']['instructor']['Insert']

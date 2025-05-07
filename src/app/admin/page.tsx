@@ -10,7 +10,7 @@ import DataTab from './tabs/DataTab'
 import CalendarSettingsModal from '@/components/modals/CalendarSettingsModal'
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('home')
+  const [activeTab, setActiveTab] = useState('data')
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [users, setUsers] = useState<any[]>([])
   const [instructors, setInstructors] = useState<Instructor[]>([])
@@ -46,10 +46,10 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     const [userData, instructorData, clientData, addressData, bookingData, availabilityData] = await Promise.all([
       supabase.from('client').select('*'),
-      supabase.from('instructor').select('*'),
-      supabase.from('client').select('*'),
-      supabase.from('address').select('*'),
-      supabase.from('booking').select(`*`),
+      supabase.from('instructor').select('*, instructor_tag(tag_id, tag(id, name, color))'),
+      supabase.from('client').select('*, client_tag(tag_id, tag(id, name, color))'),
+      supabase.from('address').select('*, address_tag(tag_id, tag(id, name, color))'),
+      supabase.from('booking').select(`*, booking_tag(tag_id, tag(id, name, color))`),
       supabase.from('availability').select(`*`)
     ])
 
