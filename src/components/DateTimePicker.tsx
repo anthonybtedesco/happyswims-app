@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { colors } from '@/lib/colors';
+import { Availability } from '@/lib/types/supabase';
 
 interface DateTimePickerProps {
   selectedDateTime: string;
   onChange: (dateTime: string) => void;
+  availabilities?: Availability[];
+  duration?: number;
 }
 
-const DateTimePicker: React.FC<DateTimePickerProps> = ({ selectedDateTime, onChange }) => {
+const DateTimePicker: React.FC<DateTimePickerProps> = ({ 
+  selectedDateTime, 
+  onChange, 
+  availabilities = [],
+  duration = 30
+}) => {
   const [date, setDate] = useState(selectedDateTime ? selectedDateTime.split('T')[0] : '');
   const [time, setTime] = useState(selectedDateTime ? selectedDateTime.split('T')[1].slice(0, 5) : '');
   const [showCalendar, setShowCalendar] = useState(false);
@@ -34,13 +42,59 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ selectedDateTime, onCha
     }
   };
 
+  const isTimeSlotAvailable = (dateStr: string, timeStr: string): boolean => {
+    if (!availabilities.length) return true;
+
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const slotStart = new Date(dateStr);
+    slotStart.setHours(hours, minutes, 0, 0);
+    const slotEnd = new Date(slotStart.getTime() + duration * 60000);
+
+    // Check if any instructor is available for this time slot
+    return availabilities.some(availability => {
+      const availStart = new Date(availability.start_date);
+      const availEnd = new Date(availability.end_date);
+
+      // Check if date is within availability period
+      if (slotStart < availStart || slotStart > availEnd) {
+        return false;
+      }
+
+      // Parse timeranges
+      const timeRanges = availability.timerange.replace(/^\[|\]$/g, '').split(',').map(range => range.trim());
+
+      // Convert times to minutes for comparison
+      const slotStartMinutes = slotStart.getHours() * 60 + slotStart.getMinutes();
+      const slotEndMinutes = slotEnd.getHours() * 60 + slotEnd.getMinutes();
+
+      return timeRanges.some(range => {
+        const [startTime, endTime] = range.split('-').map(t => t.trim());
+        const [startHours, startMinutes] = startTime.split(':').map(Number);
+        const [endHours, endMinutes] = endTime.split(':').map(Number);
+        const rangeStartMinutes = startHours * 60 + startMinutes;
+        const rangeEndMinutes = endHours * 60 + endMinutes;
+
+        // Handle ranges that cross midnight
+        if (rangeEndMinutes < rangeStartMinutes) {
+          return (slotStartMinutes >= rangeStartMinutes && slotStartMinutes <= 24 * 60) || 
+                 (slotEndMinutes >= 0 && slotEndMinutes <= rangeEndMinutes);
+        }
+
+        // Check if the slot fits within the time range
+        return slotStartMinutes >= rangeStartMinutes && slotEndMinutes <= rangeEndMinutes;
+      });
+    });
+  };
+
   const generateTimeSlots = () => {
     const slots = [];
     for (let hour = 6; hour < 21; hour++) { // 6 AM to 8 PM
       for (let minute = 0; minute < 60; minute += 30) {
         const formattedHour = hour.toString().padStart(2, '0');
         const formattedMinute = minute.toString().padStart(2, '0');
-        slots.push(`${formattedHour}:${formattedMinute}`);
+        const timeStr = `${formattedHour}:${formattedMinute}`;
+        const isAvailable = isTimeSlotAvailable(date, timeStr);
+        slots.push({ time: timeStr, available: isAvailable });
       }
     }
     return slots;
@@ -62,6 +116,22 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ selectedDateTime, onCha
       day: 'numeric',
       year: 'numeric'
     })}`;
+  };
+
+  const isDateAvailable = (dateStr: string): boolean => {
+    if (!availabilities.length) return true;
+
+    const date = new Date(dateStr);
+    date.setHours(0, 0, 0, 0);
+
+    return availabilities.some(availability => {
+      const availStart = new Date(availability.start_date);
+      const availEnd = new Date(availability.end_date);
+      availStart.setHours(0, 0, 0, 0);
+      availEnd.setHours(23, 59, 59, 999);
+
+      return date >= availStart && date <= availEnd;
+    });
   };
 
   const renderCalendar = () => {
@@ -86,17 +156,20 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ selectedDateTime, onCha
                       today.getMonth() === month && 
                       today.getDate() === day;
       const isPast = new Date(currentDate) < new Date(today.setHours(0, 0, 0, 0));
+      const isAvailable = isDateAvailable(currentDate);
 
       days.push(
         <td 
           key={day}
-          onClick={() => !isPast && handleDateChange(currentDate)}
+          onClick={() => !isPast && isAvailable && handleDateChange(currentDate)}
           style={{
             ...styles.calendarCell,
             ...(isSelected && styles.selectedDate),
             ...(isToday && styles.today),
             ...(isPast && styles.pastDate),
-            cursor: isPast ? 'not-allowed' : 'pointer',
+            ...(isAvailable && !isPast && styles.availableDate),
+            cursor: isPast || !isAvailable ? 'not-allowed' : 'pointer',
+            opacity: isPast || !isAvailable ? 0.5 : 1,
           }}
         >
           {day}
@@ -169,8 +242,16 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ selectedDateTime, onCha
             style={styles.timeSelect}
           >
             <option value="">Select Time</option>
-            {generateTimeSlots().map((timeSlot) => (
-              <option key={timeSlot} value={timeSlot}>
+            {generateTimeSlots().map(({ time: timeSlot, available }) => (
+              <option 
+                key={timeSlot} 
+                value={timeSlot}
+                style={{
+                  backgroundColor: available ? colors.status.success + '20' : colors.status.error + '20',
+                  color: available ? colors.text.primary : colors.text.disabled,
+                  fontWeight: available ? '500' : 'normal'
+                }}
+              >
                 {timeSlot}
               </option>
             ))}
@@ -295,6 +376,9 @@ const styles = {
   pastDate: {
     color: colors.text.disabled,
     backgroundColor: 'transparent',
+  },
+  availableDate: {
+    backgroundColor: colors.status.success + '20',
   },
 };
 

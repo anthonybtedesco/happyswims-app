@@ -10,7 +10,7 @@ import DataTab from './tabs/DataTab'
 import CalendarSettingsModal from '@/components/modals/CalendarSettingsModal'
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('data')
+  const [activeTab, setActiveTab] = useState('home')
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [users, setUsers] = useState<any[]>([])
   const [instructors, setInstructors] = useState<Instructor[]>([])
@@ -134,15 +134,17 @@ export default function AdminDashboard() {
         />
       )}
 
-      {activeTab === 'data' && (
-        <DataTab
-          clients={clients}
-          instructors={instructors}
-          addresses={addresses}
-          bookings={bookings}
-          availabilities={availabilities}
-          fetchData={fetchData}
-        />
+      {activeTab === 'data' && 
+        (instructors && addresses && bookings && availabilities && fetchData && (
+          <DataTab
+            clients={clients}
+            instructors={instructors}
+            addresses={addresses}
+            bookings={bookings}
+            availabilities={availabilities}
+            fetchData={fetchData}
+          />
+        )
       )}
 
       <CalendarSettingsModal

@@ -48,8 +48,22 @@ export default function HomeTab({
     })
   }, [users, clients, instructors, bookings, availabilities])
 
-  // Function to combine bookings and availabilities into calendar events
-  const getCalendarEvents = () => {
+  function calculateHeatIntensity(events: any[], time: Date) {
+    return events.filter(event => {
+      const eventStart = new Date(event.start)
+      const eventEnd = new Date(event.end)
+      return time >= eventStart && time <= eventEnd
+    }).length
+  }
+
+  function getHeatColor(intensity: number) {
+    const maxIntensity = 5
+    const normalizedIntensity = Math.min(intensity / maxIntensity, 1)
+    const hue = 120 - (normalizedIntensity * 120)
+    return `hsl(${hue}, 70%, 50%)`
+  }
+
+  function getCalendarEvents() {
     console.log('Getting calendar events. Selected user:', selectedUser)
 
     const bookingEvents = selectedUser 
@@ -59,110 +73,56 @@ export default function HomeTab({
             console.log('Filtering bookings for client:', matchingClient?.id)
             return booking.client_id === matchingClient?.id
           })
-          .map(booking => ({
+          .map(booking => {
+            const instructor = instructors.find(inst => inst.id === booking.instructor_id)
+            const client = clients.find(cli => cli.id === booking.client_id)
+            const poolAddress = addresses.find(addr => addr.id === booking.pool_address_id)
+            return {
+              id: booking.id,
+              start: booking.start_time,
+              end: booking.end_time,
+              title: `${instructor?.first_name} ${instructor?.last_name} with ${client?.first_name} ${client?.last_name}`,
+              backgroundColor: '#3b82f6',
+              borderColor: '#3b82f6',
+              display: 'block',
+              extendedProps: {
+                instructor: instructor,
+                client: client,
+                poolAddress: poolAddress,
+                duration: booking.duration,
+                status: booking.status
+              }
+            }
+          })
+      : bookings.map(booking => {
+          const instructor = instructors.find(inst => inst.id === booking.instructor_id)
+          const client = clients.find(cli => cli.id === booking.client_id)
+          const poolAddress = addresses.find(addr => addr.id === booking.pool_address_id)
+          return {
             id: booking.id,
             start: booking.start_time,
             end: booking.end_time,
-            title: `Booking`,
+            title: `${instructor?.first_name} ${instructor?.last_name} with ${client?.first_name} ${client?.last_name}`,
             backgroundColor: '#3b82f6',
             borderColor: '#3b82f6',
-            display: 'block'
-          }))
-      : bookings.map(booking => ({
-          id: booking.id,
-          start: booking.start_time,
-          end: booking.end_time,
-          title: `Booking`,
-          backgroundColor: '#3b82f6',
-          borderColor: '#3b82f6',
-          display: 'block'
-        }));
-
-    const availabilityEvents = availabilities.map(availability => {
-      try {
-        // Validate timerange exists and has correct format
-        if (!availability.timerange || !availability.timerange.includes('-')) {
-          console.error('Invalid timerange format:', availability.timerange, 'for availability:', availability.id);
-          return {
-            id: `avail-${availability.id}`,
-            start: availability.start_date,
-            end: availability.end_date,
-            title: `Available (Time not specified)`,
-            backgroundColor: availability.color || '#10b981',
-            borderColor: availability.color || '#10b981',
             display: 'block',
-            allDay: true
-          };
-        }
+            extendedProps: {
+              instructor: instructor,
+              client: client,
+              poolAddress: poolAddress,
+              duration: booking.duration,
+              status: booking.status
+            }
+          }
+        });
 
-        // Parse the time range (e.g., "00:00-16:00")
-        const [startTime, endTime] = availability.timerange.split('-');
-        
-        if (!startTime || !endTime) {
-          throw new Error(`Invalid time range format: ${availability.timerange}`);
-        }
-
-        // Create a date object for start and end using the availability date but with the time from timerange
-        const startDate = new Date(availability.start_date);
-        const endDate = new Date(availability.end_date);
-        
-        // Set the hours and minutes from the time range
-        const [startHours, startMinutes] = startTime.split(':').map(Number);
-        const [endHours, endMinutes] = endTime.split(':').map(Number);
-        
-        if (isNaN(startHours) || isNaN(startMinutes) || isNaN(endHours) || isNaN(endMinutes)) {
-          throw new Error(`Invalid time values in range: ${availability.timerange}`);
-        }
-
-        startDate.setHours(startHours, startMinutes, 0);
-        endDate.setHours(endHours, endMinutes, 0);
-
-        // Format times for display
-        const formatTime = (hours: number, minutes: number) => {
-          const period = hours >= 12 ? 'PM' : 'AM';
-          const displayHours = hours % 12 || 12;
-          return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
-        };
-
-        const displayStartTime = formatTime(startHours, startMinutes);
-        const displayEndTime = formatTime(endHours, endMinutes);
-
-        return {
-          id: `avail-${availability.id}`,
-          start: startDate.toISOString(),
-          end: endDate.toISOString(),
-          title: `Available: ${displayStartTime} - ${displayEndTime}`,
-          backgroundColor: availability.color || '#10b981',
-          borderColor: availability.color || '#10b981',
-          display: 'block',
-          allDay: false
-        };
-      } catch (err) {
-        const error = err as Error;
-        console.error('Error processing availability:', error, 'Availability:', availability);
-        // Return a fallback event
-        return {
-          id: `avail-${availability.id}`,
-          start: availability.start_date,
-          end: availability.end_date,
-          title: `Available (Error: ${error.message})`,
-          backgroundColor: availability.color || '#10b981',
-          borderColor: availability.color || '#10b981',
-          display: 'block',
-          allDay: true
-        };
-      }
-    });
-
-    const combinedEvents = [...bookingEvents, ...availabilityEvents];
     console.log('Calendar Events:', {
       bookings: bookingEvents.length,
-      availabilities: availabilityEvents.length,
-      total: combinedEvents.length
-    })
+      total: bookingEvents.length
+    });
 
-    return combinedEvents;
-  };
+    return bookingEvents;
+  }
 
   return (
     <div style={{ display: 'flex', gap: '2rem' }}>
@@ -218,6 +178,42 @@ export default function HomeTab({
               start: info.event.start,
               end: info.event.end
             })
+
+            // Add tooltip
+            const { instructor, client, poolAddress, duration, status } = info.event.extendedProps;
+            const tooltip = document.createElement('div');
+            tooltip.style.cssText = `
+              position: absolute;
+              background: white;
+              border: 1px solid #e2e8f0;
+              border-radius: 6px;
+              padding: 12px;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+              z-index: 1000;
+              max-width: 300px;
+              display: none;
+            `;
+
+            tooltip.innerHTML = `
+              <div style="font-weight: 500; margin-bottom: 8px;">Booking Details</div>
+              <div style="margin-bottom: 4px;"><strong>Instructor:</strong> ${instructor?.first_name} ${instructor?.last_name}</div>
+              <div style="margin-bottom: 4px;"><strong>Client:</strong> ${client?.first_name} ${client?.last_name}</div>
+              <div style="margin-bottom: 4px;"><strong>Location:</strong> ${poolAddress?.address_line}, ${poolAddress?.city}</div>
+              <div style="margin-bottom: 4px;"><strong>Duration:</strong> ${duration} minutes</div>
+              <div style="margin-bottom: 4px;"><strong>Status:</strong> ${status}</div>
+            `;
+
+            info.el.addEventListener('mouseenter', () => {
+              document.body.appendChild(tooltip);
+              const rect = info.el.getBoundingClientRect();
+              tooltip.style.display = 'block';
+              tooltip.style.top = `${rect.bottom + window.scrollY + 10}px`;
+              tooltip.style.left = `${rect.left + window.scrollX}px`;
+            });
+
+            info.el.addEventListener('mouseleave', () => {
+              tooltip.remove();
+            });
           }}
         />
       </div>

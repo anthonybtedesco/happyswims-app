@@ -138,36 +138,40 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
 
         console.log(`Found ${instructors.length} instructors with valid home addresses`);
 
-        // Prepare coordinates for Matrix API
-        const sources = instructors.map(inst => {
-          const homeAddress = addresses.find(addr => addr.id === inst.home_address_id);
-          return {
-            lat: homeAddress?.latitude,
-            lng: homeAddress?.longitude
-          };
-        }).filter(coord => coord.lat !== undefined && coord.lng !== undefined);
-        
-        const destinations = [{ lat: selectedPool.latitude!, lng: selectedPool.longitude! }];
+        // Process instructors in batches of 10
+        const BATCH_SIZE = 10;
+        const updatedInstructors: InstructorWithTravelTime[] = [...instructors];
+        const destination = [{ lat: selectedPool.latitude!, lng: selectedPool.longitude! }];
 
-        // Call Matrix API
-        console.log('Calling Matrix API with sources:', sources, 'and destinations:', destinations);
-        const result = await calculateMatrix(sources as {lat: number, lng: number}[], destinations as {lat: number, lng: number}[]);
-        console.log('Matrix API result:', result);
-
-        // Update instructors with travel times
-        const updatedInstructors = instructors.map((instructor) => {
-          // Find index in validInstructors to map to Matrix API result
-          const validIndex = instructors.findIndex(i => i.id === instructor.id);
-          
-          if (validIndex !== -1 && result.durations && result.durations[validIndex]) {
+        for (let i = 0; i < instructors.length; i += BATCH_SIZE) {
+          const batch = instructors.slice(i, i + BATCH_SIZE);
+          const sources = batch.map(inst => {
+            const homeAddress = addresses.find(addr => addr.id === inst.home_address_id);
             return {
-              ...instructor,
-              travel_time_seconds: result.durations[validIndex][0]
+              lat: homeAddress?.latitude,
+              lng: homeAddress?.longitude
             };
-          }
+          }).filter(coord => coord.lat !== undefined && coord.lng !== undefined);
+
+          console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1} with ${sources.length} instructors`);
+          const result = await calculateMatrix(sources as {lat: number, lng: number}[], destination as {lat: number, lng: number}[]);
           
-          return instructor;
-        });
+          // Update instructors in this batch with their travel times
+          batch.forEach((instructor, batchIndex) => {
+            const index = i + batchIndex;
+            if (result.durations && result.durations[batchIndex]) {
+              updatedInstructors[index] = {
+                ...instructor,
+                travel_time_seconds: result.durations[batchIndex][0]
+              };
+            }
+          });
+
+          // Add a small delay between batches to avoid rate limiting
+          if (i + BATCH_SIZE < instructors.length) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
 
         // Sort instructors by travel time (instructors without travel time at the end)
         updatedInstructors.sort((a, b) => {
