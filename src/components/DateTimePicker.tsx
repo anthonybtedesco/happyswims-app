@@ -1,24 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { colors } from '@/lib/colors';
 import { Availability } from '@/lib/types/supabase';
+import { supabase } from '@/lib/supabase/client';
 
 interface DateTimePickerProps {
   selectedDateTime: string;
   onChange: (dateTime: string) => void;
-  availabilities?: Availability[];
   duration?: number;
 }
 
 const DateTimePicker: React.FC<DateTimePickerProps> = ({ 
   selectedDateTime, 
   onChange, 
-  availabilities = [],
   duration = 30
 }) => {
   const [date, setDate] = useState(selectedDateTime ? selectedDateTime.split('T')[0] : '');
   const [time, setTime] = useState(selectedDateTime ? selectedDateTime.split('T')[1].slice(0, 5) : '');
   const [showCalendar, setShowCalendar] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [availabilities, setAvailabilities] = useState<Availability[]>([]);
+
+  useEffect(() => {
+    async function fetchAvailabilities() {
+      const { data, error } = await supabase
+        .from('availability')
+        .select('*')
+        .gte('end_date', new Date().toISOString());
+
+      if (error) {
+        console.error('Error fetching availabilities:', error);
+        return;
+      }
+
+      if (data) {
+        console.log('Fetched availabilities:', data);
+        setAvailabilities(data);
+      }
+    }
+
+    fetchAvailabilities();
+  }, []);
 
   useEffect(() => {
     if (selectedDateTime) {
@@ -43,47 +64,95 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   };
 
   const isTimeSlotAvailable = (dateStr: string, timeStr: string): boolean => {
-    if (!availabilities.length) return true;
+    console.log('\n=== Checking Time Slot Availability ===');
+    console.log('Date:', dateStr);
+    console.log('Time:', timeStr);
+    console.log('Duration:', duration, 'minutes');
+    
+    if (!availabilities.length) {
+      console.log('No availabilities provided');
+      return false;
+    }
+
+    if (!dateStr || !timeStr) {
+      console.log('Invalid date or time string');
+      return false;
+    }
 
     const [hours, minutes] = timeStr.split(':').map(Number);
     const slotStart = new Date(dateStr);
     slotStart.setHours(hours, minutes, 0, 0);
+
+    if (isNaN(slotStart.getTime())) {
+      console.log('Invalid date created');
+      return false;
+    }
+
     const slotEnd = new Date(slotStart.getTime() + duration * 60000);
+    
+    console.log('Slot Start:', slotStart.toISOString());
+    console.log('Slot End:', slotEnd.toISOString());
 
-    // Check if any instructor is available for this time slot
-    return availabilities.some(availability => {
-      const availStart = new Date(availability.start_date);
-      const availEnd = new Date(availability.end_date);
+    const instructorIds = new Set(availabilities.map(a => a.instructor_id));
+    console.log('Available Instructor IDs:', Array.from(instructorIds));
+    
+    const isAvailable = Array.from(instructorIds).some(instructorId => {
+      console.log(`\nChecking instructor ${instructorId}:`);
+      const instructorAvailabilities = availabilities.filter(a => a.instructor_id === instructorId);
+      console.log('Instructor availabilities:', instructorAvailabilities);
+      
+      const isInstructorAvailable = instructorAvailabilities.some(availability => {
+        const availStart = new Date(availability.start_date);
+        const availEnd = new Date(availability.end_date);
+        
+        console.log('\nChecking availability period:');
+        console.log('Availability Start:', availStart.toISOString());
+        console.log('Availability End:', availEnd.toISOString());
 
-      // Check if date is within availability period
-      if (slotStart < availStart || slotStart > availEnd) {
-        return false;
-      }
-
-      // Parse timeranges
-      const timeRanges = availability.timerange.replace(/^\[|\]$/g, '').split(',').map(range => range.trim());
-
-      // Convert times to minutes for comparison
-      const slotStartMinutes = slotStart.getHours() * 60 + slotStart.getMinutes();
-      const slotEndMinutes = slotEnd.getHours() * 60 + slotEnd.getMinutes();
-
-      return timeRanges.some(range => {
-        const [startTime, endTime] = range.split('-').map(t => t.trim());
-        const [startHours, startMinutes] = startTime.split(':').map(Number);
-        const [endHours, endMinutes] = endTime.split(':').map(Number);
-        const rangeStartMinutes = startHours * 60 + startMinutes;
-        const rangeEndMinutes = endHours * 60 + endMinutes;
-
-        // Handle ranges that cross midnight
-        if (rangeEndMinutes < rangeStartMinutes) {
-          return (slotStartMinutes >= rangeStartMinutes && slotStartMinutes <= 24 * 60) || 
-                 (slotEndMinutes >= 0 && slotEndMinutes <= rangeEndMinutes);
+        if (slotStart < availStart || slotStart > availEnd) {
+          console.log('Slot is outside availability period');
+          return false;
         }
 
-        // Check if the slot fits within the time range
-        return slotStartMinutes >= rangeStartMinutes && slotEndMinutes <= rangeEndMinutes;
+        const timeRanges = availability.timerange.replace(/^\[|\]$/g, '').split(',').map(range => range.trim());
+        console.log('Time ranges:', timeRanges);
+
+        const slotStartMinutes = slotStart.getHours() * 60 + slotStart.getMinutes();
+        const slotEndMinutes = slotEnd.getHours() * 60 + slotEnd.getMinutes();
+        console.log('Slot minutes:', { start: slotStartMinutes, end: slotEndMinutes });
+
+        const isInTimeRange = timeRanges.some(range => {
+          const [startTime, endTime] = range.split('-').map(t => t.trim());
+          const [startHours, startMinutes] = startTime.split(':').map(Number);
+          const [endHours, endMinutes] = endTime.split(':').map(Number);
+          const rangeStartMinutes = startHours * 60 + startMinutes;
+          const rangeEndMinutes = endHours * 60 + endMinutes;
+          
+          console.log('\nChecking time range:', range);
+          console.log('Range minutes:', { start: rangeStartMinutes, end: rangeEndMinutes });
+
+          if (rangeEndMinutes < rangeStartMinutes) {
+            const isAvailable = (slotStartMinutes >= rangeStartMinutes && slotStartMinutes <= 24 * 60) || 
+                              (slotEndMinutes >= 0 && slotEndMinutes <= rangeEndMinutes);
+            console.log('Crosses midnight, available:', isAvailable);
+            return isAvailable;
+          }
+
+          const isAvailable = slotStartMinutes >= rangeStartMinutes && slotEndMinutes <= rangeEndMinutes;
+          console.log('Within range, available:', isAvailable);
+          return isAvailable;
+        });
+
+        console.log('Is in time range:', isInTimeRange);
+        return isInTimeRange;
       });
+
+      console.log('Is instructor available:', isInstructorAvailable);
+      return isInstructorAvailable;
     });
+
+    console.log('\nFinal availability result:', isAvailable);
+    return isAvailable;
   };
 
   const generateTimeSlots = () => {
@@ -119,19 +188,36 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   };
 
   const isDateAvailable = (dateStr: string): boolean => {
-    if (!availabilities.length) return true;
+    console.log('\n=== Checking Date Availability ===');
+    console.log('Date:', dateStr);
+    
+    if (!availabilities.length) {
+      console.log('No availabilities provided');
+      return true;
+    }
 
     const date = new Date(dateStr);
     date.setHours(0, 0, 0, 0);
+    console.log('Normalized date:', date.toISOString());
 
-    return availabilities.some(availability => {
+    const isAvailable = availabilities.some(availability => {
       const availStart = new Date(availability.start_date);
       const availEnd = new Date(availability.end_date);
       availStart.setHours(0, 0, 0, 0);
       availEnd.setHours(23, 59, 59, 999);
-
-      return date >= availStart && date <= availEnd;
+      
+      console.log('\nChecking availability:');
+      console.log('Availability Start:', availStart.toISOString());
+      console.log('Availability End:', availEnd.toISOString());
+      
+      const isInRange = date >= availStart && date <= availEnd;
+      console.log('Is in range:', isInRange);
+      
+      return isInRange;
     });
+
+    console.log('Final date availability:', isAvailable);
+    return isAvailable;
   };
 
   const renderCalendar = () => {

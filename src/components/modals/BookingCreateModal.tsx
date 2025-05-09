@@ -199,6 +199,85 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
   // Only depend on pool_address changes to avoid infinite loops
   }, [formData.pool_address_id, instructors]);
 
+  // New useEffect to update instructor availability when relevant fields change
+  useEffect(() => {
+    if (!formData.start_time || !formData.pool_address_id) {
+      return;
+    }
+
+    // Clear the processed addresses cache when relevant fields change
+    processedAddressesRef.current.clear();
+    
+    // Trigger a recalculation of travel times
+    const calculateTravelTimes = async () => {
+      if (isCalculatingRef.current) {
+        return;
+      }
+
+      try {
+        isCalculatingRef.current = true;
+        const selectedPool = addresses.find(addr => addr.id === formData.pool_address_id);
+        
+        if (!selectedPool || !selectedPool.latitude || !selectedPool.longitude) {
+          console.error('Failed to get coordinates for pool address:', selectedPool);
+          return;
+        }
+
+        const updatedInstructors: InstructorWithTravelTime[] = [...instructors];
+        const destination = [{ lat: selectedPool.latitude, lng: selectedPool.longitude }];
+
+        // Process instructors in batches of 10
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < instructors.length; i += BATCH_SIZE) {
+          const batch = instructors.slice(i, i + BATCH_SIZE);
+          const sources = batch.map(inst => {
+            const homeAddress = addresses.find(addr => addr.id === inst.home_address_id);
+            return {
+              lat: homeAddress?.latitude,
+              lng: homeAddress?.longitude
+            };
+          }).filter(coord => coord.lat !== undefined && coord.lng !== undefined);
+
+          const result = await calculateMatrix(sources as {lat: number, lng: number}[], destination as {lat: number, lng: number}[]);
+          
+          batch.forEach((instructor, batchIndex) => {
+            const index = i + batchIndex;
+            if (result.durations && result.durations[batchIndex]) {
+              updatedInstructors[index] = {
+                ...instructor,
+                travel_time_seconds: result.durations[batchIndex][0]
+              };
+            }
+          });
+
+          if (i + BATCH_SIZE < instructors.length) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+
+        // Sort instructors by travel time
+        updatedInstructors.sort((a, b) => {
+          const aTravelTime = 'travel_time_seconds' in a ? a.travel_time_seconds : undefined;
+          const bTravelTime = 'travel_time_seconds' in b ? b.travel_time_seconds : undefined;
+          
+          if (aTravelTime === undefined && bTravelTime === undefined) return 0;
+          if (aTravelTime === undefined) return 1;
+          if (bTravelTime === undefined) return -1;
+          return aTravelTime! - bTravelTime!;
+        });
+
+        setInstructorsWithTravelTime(updatedInstructors);
+      } catch (err) {
+        console.error('Error updating instructor availability:', err);
+        setError(`Failed to update instructor availability: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        isCalculatingRef.current = false;
+      }
+    };
+
+    calculateTravelTimes();
+  }, [formData.start_time, formData.pool_address_id, formData.duration, formData.recurrence_weeks, instructors, addresses]);
+
   const handleAddressSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
