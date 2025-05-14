@@ -19,8 +19,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   const [showCalendar, setShowCalendar] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
+  const [fetchedAvailabilites, setFetchedAvailabilites] = useState(false);
 
   useEffect(() => {
+    if (fetchedAvailabilites) {return}
     async function fetchAvailabilities() {
       const { data, error } = await supabase
         .from('availability')
@@ -35,6 +37,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
       if (data) {
         console.log('Fetched availabilities:', data);
         setAvailabilities(data);
+        setFetchedAvailabilites(true)
       }
     }
 

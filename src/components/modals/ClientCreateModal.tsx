@@ -1,14 +1,13 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase/client'
 import { colors, buttonVariants } from '@/lib/colors'
 import { adminSignUp } from '@/lib/auth'
 import { geocodeNewAddress } from '@/lib/geocoding'
 import { MAPBOX_ACCESS_TOKEN } from '@/lib/mapbox/config'
-import { AddressAutofill } from '@mapbox/search-js-react'
-
+import { AddressInput, useData } from '@/lib/context/DataContext'
 import AutofillAddress from '@/lib/mapbox/AutofillAddress'
+
 type ClientCreateModalProps = {
   isOpen: boolean
   onClose: () => void
@@ -17,13 +16,13 @@ type ClientCreateModalProps = {
 const DELAY_MS = 1000 // 1 second delay
 
 export default function ClientCreateModal({ isOpen, onClose }: ClientCreateModalProps) {
+  const { createAddress, createClient } = useData()
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
     email: '',
-
     address_line: '',
     city: '',
     state: '',
@@ -85,30 +84,25 @@ export default function ClientCreateModal({ isOpen, onClose }: ClientCreateModal
       
       console.log('Creating address with data:', addressInsertData);
       
-      const { data: addressData, error: addressError } = await supabase
-        .from('address')
-        .insert([addressInsertData])
-        .select()
-        .single()
-
-      if (addressError) throw addressError
+      const newAddress = await createAddress(addressInsertData as AddressInput);
+      
+      if (!newAddress) {
+        throw new Error('Failed to create address');
+      }
 
       // Then create the client record
       const clientData = {
         first_name: formData.first_name,
         last_name: formData.last_name,
         user_id: userId,
-        home_address_id: addressData.id
+        home_address_id: newAddress.id
       }
       console.log('Client Data:', clientData)
 
-      const { error: clientError } = await supabase
-        .from('client')
-        .insert([clientData])
-
-      if (clientError) {
-        console.error('Client Error:', clientError)
-        throw clientError
+      const newClient = await createClient(clientData);
+      
+      if (!newClient) {
+        throw new Error('Failed to create client');
       }
 
       setSuccess(true)
@@ -259,6 +253,7 @@ export default function ClientCreateModal({ isOpen, onClose }: ClientCreateModal
                 Address
               </label>
               <AutofillAddress 
+                key={`${formData.address_line}-${formData.city}-${formData.state}-${formData.zip}`}
                 initialData={{
                   address_line: formData.address_line,
                   city: formData.city,

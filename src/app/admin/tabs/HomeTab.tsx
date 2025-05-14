@@ -224,10 +224,6 @@ export default function HomeTab({
           console.log('Closing booking modal')
           setShowBookingModal(false)
         }}
-        instructors={instructors}
-        clients={clients}
-        addresses={addresses}
-        availabilities={availabilities}
       />
 
       <ClientCreateModal

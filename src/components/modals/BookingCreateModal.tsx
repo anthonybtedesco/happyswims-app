@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { colors, buttonVariants } from '@/lib/colors'
 import { MapComponent, calculateMatrix, formatDuration } from '@/lib/mapbox'
@@ -10,6 +10,8 @@ import { Address, Instructor, Client, BookingInsert, Availability } from '@/lib/
 import InstructorList from '../InstructorList'
 import { geocodeNewAddress } from '@/lib/geocoding'
 import DateTimePicker from '@/components/DateTimePicker'
+import JoinCreateOrSelect from '@/components/forms/JoinCreateOrSelect'
+import { AddressInput, useData } from '@/lib/context/DataContext'
 
 // Extended instructor type that includes travel time
 type InstructorWithTravelTime = Instructor & {
@@ -20,13 +22,19 @@ type InstructorWithTravelTime = Instructor & {
 type BookingCreateModalProps = {
   isOpen: boolean
   onClose: () => void
-  instructors: Instructor[]
-  clients: Client[]
-  addresses: Address[]
-  availabilities: Availability[]
 }
 
-export default function BookingCreateModal({ isOpen, onClose, instructors, clients, addresses, availabilities }: BookingCreateModalProps) {
+export default function BookingCreateModal({ isOpen, onClose }: BookingCreateModalProps) {
+  // Get data from context
+  const { 
+    instructors, 
+    clients, 
+    addresses, 
+    availabilities,
+    createAddress,
+    createBooking
+  } = useData()
+
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [showAddressForm, setShowAddressForm] = useState(false)
@@ -53,12 +61,43 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
   // Track which addresses have been processed
   const processedAddressesRef = useRef<Set<string>>(new Set());
 
+  // Reset form when modal is opened/closed
+  useEffect(() => {
+    if (isOpen) {
+      setError(null);
+      setSuccess(false);
+      setShowAddressForm(false);
+      setFormData({
+        client_id: '',
+        instructor_id: '',
+        pool_address_id: '',
+        start_time: '',
+        duration: 30,
+        recurrence_weeks: 0,
+        status: 'scheduled'
+      });
+      setAddressData({
+        address_line: '',
+        city: '',
+        state: '',
+        zip: ''
+      });
+      // Clear processed addresses cache
+      processedAddressesRef.current.clear();
+    }
+  }, [isOpen]);
+
+  // Update instructorsWithTravelTime when instructors change
+  useEffect(() => {
+    setInstructorsWithTravelTime(instructors);
+  }, [instructors]);
+
   // Log when modal opens or closes
   useEffect(() => {
     console.log(`BookingCreateModal ${isOpen ? 'opened' : 'closed'}`);
-    console.log('Initial instructors:', instructors);
-    console.log('Initial clients:', clients);
-    console.log('Initial addresses:', addresses);
+    console.log('Instructors:', instructors);
+    console.log('Clients:', clients);
+    console.log('Addresses:', addresses);
   }, [isOpen, instructors, clients, addresses]);
 
   // Log form data changes
@@ -92,29 +131,7 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
         console.log('Calculating travel times for instructors to pool:', formData.pool_address_id);
         
         // Find selected pool address
-        let selectedPool: Address | undefined;
-        const selectedPoolRaw = addresses.find(addr => addr.id === formData.pool_address_id);
-        
-        // If not found in addressesWithCoordinates, try finding in original addresses prop
-        if (!selectedPoolRaw) {
-          console.log('Address not found in addresses, trying original addresses');
-          const originalAddress = addresses.find(addr => addr.id === formData.pool_address_id);
-          
-          if (!originalAddress) {
-            console.error('Pool address not found in any address list:', formData.pool_address_id);
-            setInstructorsWithTravelTime(instructors);
-            isCalculatingRef.current = false;
-            return;
-          }
-          
-          // Process this address without updating state immediately to avoid loops
-          console.log('Found address in original addresses:', originalAddress);
-          selectedPool = originalAddress;
-        } else {
-          // Ensure the selected pool has coordinates
-          console.log('Ensuring pool address has coordinates');
-          selectedPool = selectedPoolRaw;
-        }
+        const selectedPool = addresses.find(addr => addr.id === formData.pool_address_id);
         
         if (!selectedPool || !selectedPool.latitude || !selectedPool.longitude) {
           console.error('Failed to get coordinates for pool address:', selectedPool);
@@ -122,11 +139,10 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
           isCalculatingRef.current = false;
           return;
         }
-
+        
         // Mark this address as processed to avoid repeated processing
         processedAddressesRef.current.add(formData.pool_address_id);
         
-        // Get instructors with home addresses and ensure they have coordinates
         console.log('Processing instructor home addresses');
 
         if (instructors.length === 0) {
@@ -197,7 +213,7 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
 
     calculateTravelTimes();
   // Only depend on pool_address changes to avoid infinite loops
-  }, [formData.pool_address_id, instructors]);
+  }, [formData.pool_address_id, instructors, addresses]);
 
   // New useEffect to update instructor availability when relevant fields change
   useEffect(() => {
@@ -278,8 +294,7 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
     calculateTravelTimes();
   }, [formData.start_time, formData.pool_address_id, formData.duration, formData.recurrence_weeks, instructors, addresses]);
 
-  const handleAddressSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleAddressSubmit = async () => {
     try {
       console.log("Submitting new address:", addressData);
       setError(null);
@@ -291,7 +306,6 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
         return;
       }
       
-      // Get coordinates for the address using our new utility
       console.log('Geocoding address before creating record');
       const coordinates = await geocodeNewAddress(
         addressData.address_line,
@@ -302,38 +316,24 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
       
       console.log('Geocoding results:', coordinates);
       
-      // Create address record with coordinates if available
       const addressInsertData = {
         ...addressData,
         ...(coordinates && { 
-          latitude: coordinates[1],  // Latitude is the second element in the tuple
-          longitude: coordinates[0]  // Longitude is the first element in the tuple
+          latitude: coordinates[1],
+          longitude: coordinates[0]
         })
       };
       
       console.log("Inserting address into database with data:", addressInsertData);
-      const { data, error: dbError } = await supabase
-        .from('address')
-        .insert([addressInsertData])
-        .select();
+      const newAddress = await createAddress(addressInsertData as AddressInput);
 
-      if (dbError) {
-        console.error("Database error when inserting address:", dbError);
-        throw dbError;
+      if (!newAddress) {
+        throw new Error("Failed to create address");
       }
 
-      console.log("Address saved successfully:", data);
-
-      if (data) {
-        // Add the new address to the addressesWithCoordinates state
-        const newAddress = {
-          ...data[0]
-        };
-        
-        console.log("Adding new address to state:", newAddress);
-        setFormData({ ...formData, pool_address_id: data[0].id });
-        setShowAddressForm(false);
-      }
+      console.log("Address saved successfully:", newAddress);
+      setFormData({ ...formData, pool_address_id: newAddress.id });
+      setShowAddressForm(false);
     } catch (err: any) {
       const errorMsg = `Failed to save address: ${err.message || String(err)}`;
       console.error(errorMsg, err);
@@ -405,16 +405,13 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
       };
       
       console.log("Saving booking to database:", bookingData);
-      const { data, error: dbError } = await supabase
-        .from('booking')
-        .insert([bookingData]);
+      const newBooking = await createBooking(bookingData);
 
-      if (dbError) {
-        console.error("Database error when creating booking:", dbError);
-        throw dbError;
+      if (!newBooking) {
+        throw new Error("Failed to create booking");
       }
 
-      console.log("Booking created successfully:", data);
+      console.log("Booking created successfully:", newBooking);
       setSuccess(true);
       setFormData({
         client_id: '',
@@ -437,12 +434,33 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
     }
   }
 
-  // Log when modal opens or closes
-  useEffect(() => {
-    if (isOpen) {
-      console.log("BookingCreateModal opened");
-    }
-  }, [isOpen]);
+  const clientOptions = useMemo(() => clients.map(client => ({
+    value: client.id,
+    label: `${client.first_name} ${client.last_name}`
+  })), [clients])
+
+  const addressOptions = addresses.map(address => ({
+    value: address.id,
+    label: `${address.address_line}, ${address.city}, ${address.state} ${address.zip}`
+  }))
+
+  function handleClientCreated(newClient: Client) {
+    console.log("New client created:", newClient)
+    // Update form data with the new client and their home address
+    setFormData(prev => ({ 
+      ...prev, 
+      client_id: newClient.id, 
+      pool_address_id: newClient.home_address_id || prev.pool_address_id
+    }))
+  }
+
+  function handleAddressCreated(newAddress: Address) {
+    console.log("New address created:", newAddress)
+    setFormData({ 
+      ...formData, 
+      pool_address_id: newAddress.id
+    })
+  }
 
   if (!isOpen) return null;
 
@@ -482,6 +500,7 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
             Create New Booking
           </h2>
           <button
+            type="button"
             onClick={() => {
               console.log("Closing BookingCreateModal");
               onClose();
@@ -504,33 +523,24 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
               <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.text.secondary }}>
                 Client
               </label>
-              <select
+              <JoinCreateOrSelect
                 value={formData.client_id}
-                onChange={(e) => {
-                  console.log("Selected client:", e.target.value);
-                  const selectedClient = clients.find(client => client.id === e.target.value);
+                onChange={(value) => {
+                  console.log("Selected client:", value)
+                  const selectedClient = clients.find(client => client.id === value)
                   setFormData({ 
                     ...formData, 
-                    client_id: e.target.value, 
+                    client_id: value, 
                     pool_address_id: selectedClient?.home_address_id || ''
-                  });
+                  })
                 }}
+                relatedTable="client"
+                options={clientOptions}
+                label="Client"
                 required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '6px',
-                  border: `1px solid ${colors.border.light}`,
-                  backgroundColor: colors.common.white
-                }}
-              >
-                <option value="">Select Client</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.first_name} {client.last_name}
-                  </option>
-                ))}
-              </select>
+                onItemCreated={handleClientCreated}
+                addresses={addresses}
+              />
             </div>
 
             <div>
@@ -539,28 +549,18 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
               </label>
               {!showAddressForm ? (
                 <>
-                  <select
+                  <JoinCreateOrSelect
                     value={formData.pool_address_id}
-                    onChange={(e) => {
-                      console.log("Selected pool address:", e.target.value);
-                      setFormData({ ...formData, pool_address_id: e.target.value });
+                    onChange={(value) => {
+                      console.log("Selected pool address:", value)
+                      setFormData({ ...formData, pool_address_id: value })
                     }}
+                    relatedTable="address"
+                    options={addressOptions}
+                    label="Pool Address"
                     required
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      borderRadius: '6px',
-                      border: `1px solid ${colors.border.light}`,
-                      backgroundColor: colors.common.white
-                    }}
-                  >
-                    <option value="">Select Pool</option>
-                    {addresses.map((address) => (
-                      <option key={address.id} value={address.id}>
-                        {address.address_line}, {address.city}, {address.state} {address.zip}
-                      </option>
-                    ))}
-                  </select>
+                    onItemCreated={handleAddressCreated}
+                  />
                   <button
                     type="button"
                     onClick={() => {
@@ -599,39 +599,38 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
                 </>
               ) : (
                 <div style={{ border: `1px solid ${colors.border.light}`, padding: '1rem', borderRadius: '6px' }}>
-                  <form onSubmit={handleAddressSubmit}>
-                    <div style={{ display: 'grid', gap: '1rem' }}>
-                      <AutofillAddress />
-                    </div>
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                      <button
-                        type="submit"
-                        style={{
-                          ...buttonVariants.primary,
-                          padding: '0.5rem 1rem',
-                          borderRadius: '6px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Save Address
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          console.log("Canceling address form");
-                          setShowAddressForm(false);
-                        }}
-                        style={{
-                          ...buttonVariants.secondary,
-                          padding: '0.5rem 1rem',
-                          borderRadius: '6px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
+                  <div style={{ display: 'grid', gap: '1rem' }}>
+                    <AutofillAddress />
+                  </div>
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                    <button
+                      type="button"
+                      onClick={handleAddressSubmit}
+                      style={{
+                        ...buttonVariants.primary,
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Save Address
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        console.log("Canceling address form");
+                        setShowAddressForm(false);
+                      }}
+                      style={{
+                        ...buttonVariants.secondary,
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -716,7 +715,6 @@ export default function BookingCreateModal({ isOpen, onClose, instructors, clien
                 recurrenceWeeks={formData.recurrence_weeks}
               />
             </div>
-
 
           {error && (
             <div style={{

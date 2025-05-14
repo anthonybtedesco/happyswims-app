@@ -1,8 +1,10 @@
+'use client'
 import React, { useState, useEffect, useRef } from 'react'
-import { supabase } from '@/lib/supabase/client'
 import JoinCreateOrSelect from './JoinCreateOrSelect'
 import MapboxAddressAutofill from './MapboxAddressAutofill'
 import UserIdSelect from './UserIdSelect'
+import { useData } from '@/lib/context/DataContext'
+import { AddressInput, ClientInput, InstructorInput, AvailabilityInput, BookingInput } from '@/lib/context/DataContext'
 
 interface FormField {
   key: string
@@ -17,53 +19,55 @@ interface FormField {
 interface CreateItemProps {
   table: string
   onClose: () => void
-  onSuccess: () => Promise<void>
+  onSuccess: (newItem: any) => Promise<void>
   options?: {
     instructors?: { id: string; first_name: string; last_name: string }[]
     clients?: { id: string; first_name: string; last_name: string }[]
     addresses?: { id: string; address_line: string }[]
   }
   noForm?: boolean
+  nestedSelections?: {
+    table: string
+    label: string
+    options: { value: string; label: string }[]
+    onItemCreated?: (newItem: any) => void
+  }[]
 }
 
-export default function CreateItem({ table, onClose, onSuccess, options = {}, noForm = false }: CreateItemProps) {
+export default function CreateItem({ table, onClose, onSuccess, options = {}, noForm = false, nestedSelections }: CreateItemProps) {
+  const { 
+    createClient, 
+    createInstructor, 
+    createAddress, 
+    createAvailability, 
+    createBooking,
+    instructors: contextInstructors,
+    clients: contextClients,
+    addresses: contextAddresses
+  } = useData()
+  
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [localOptions, setLocalOptions] = useState(options)
   const isFirstRender = useRef(true)
 
-  // Update local options only on initial render or when options actually change
+  // Update local options with context data
   useEffect(() => {
-    // Skip the first render since we already initialized with options
-    if (isFirstRender.current) {
-      isFirstRender.current = false
-      return
+    const mergedOptions = {
+      instructors: contextInstructors.length > 0 
+        ? contextInstructors 
+        : options.instructors || [],
+      clients: contextClients.length > 0 
+        ? contextClients 
+        : options.clients || [],
+      addresses: contextAddresses.length > 0 
+        ? contextAddresses 
+        : options.addresses || []
     }
-
-    // Compare options using JSON.stringify to avoid referencing localOptions directly
-    const optionsString = JSON.stringify({
-      instructorsLength: options.instructors?.length || 0,
-      clientsLength: options.clients?.length || 0,
-      addressesLength: options.addresses?.length || 0
-    })
     
-    const currentOptionsString = JSON.stringify({
-      instructorsLength: localOptions.instructors?.length || 0,
-      clientsLength: localOptions.clients?.length || 0,
-      addressesLength: localOptions.addresses?.length || 0
-    })
-    
-    if (optionsString !== currentOptionsString) {
-      setLocalOptions(options)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    options, 
-    options.instructors?.length, 
-    options.clients?.length, 
-    options.addresses?.length
-  ])
+    setLocalOptions(mergedOptions)
+  }, [contextInstructors, contextClients, contextAddresses, options])
 
   // Define form fields based on table
   const getFormFields = (): FormField[] => {
@@ -129,8 +133,8 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
               label: `${instructor.first_name} ${instructor.last_name}`
             })) || []
           },
-          { key: 'start', label: 'Start Time', type: 'date', required: true },
-          { key: 'end', label: 'End Time', type: 'date', required: true },
+          { key: 'start_time', label: 'Start Time', type: 'date', required: true },
+          { key: 'end_time', label: 'End Time', type: 'date', required: true },
           { 
             key: 'status', 
             label: 'Status', 
@@ -211,7 +215,6 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
     setErrorMessage('')
 
     try {
-      // Set default values for fields that have them but weren't filled in
       const fields = getFormFields()
       const dataWithDefaults = { ...formData }
       
@@ -221,53 +224,59 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
         }
       })
 
-      const { data, error } = await supabase
-        .from(table)
-        .insert([dataWithDefaults])
-        .select()
+      let newItem = null
 
-      if (error) throw error
-
-      console.log('Item created:', data)
-      
-      // After successful creation, update related data if needed
-      if (data && data.length > 0) {
-        const newItem = data[0]
-        
-        // Update local options based on the type of item created
-        if (table === 'client' && newItem.id) {
-          const newClient = {
-            id: newItem.id,
-            first_name: newItem.first_name,
-            last_name: newItem.last_name
+      // Use the appropriate create function from context with type assertion
+      switch (table) {
+        case 'client':
+          // Verify required fields are present
+          if (!dataWithDefaults.first_name || !dataWithDefaults.last_name || 
+              !dataWithDefaults.user_id || !dataWithDefaults.home_address_id) {
+            throw new Error('Missing required fields for client')
           }
-          setLocalOptions(prev => ({
-            ...prev,
-            clients: [...(prev.clients || []), newClient]
-          }))
-        } else if (table === 'instructor' && newItem.id) {
-          const newInstructor = {
-            id: newItem.id,
-            first_name: newItem.first_name,
-            last_name: newItem.last_name
+          newItem = await createClient(dataWithDefaults as ClientInput)
+          break
+        case 'instructor':
+          // Verify required fields are present
+          if (!dataWithDefaults.first_name || !dataWithDefaults.last_name || 
+              !dataWithDefaults.user_id) {
+            throw new Error('Missing required fields for instructor')
           }
-          setLocalOptions(prev => ({
-            ...prev,
-            instructors: [...(prev.instructors || []), newInstructor]
-          }))
-        } else if (table === 'address' && newItem.id) {
-          const newAddress = {
-            id: newItem.id,
-            address_line: newItem.address_line
+          newItem = await createInstructor(dataWithDefaults as InstructorInput)
+          break
+        case 'address':
+          // Verify required fields are present
+          if (!dataWithDefaults.address_line || !dataWithDefaults.city || 
+              !dataWithDefaults.state || !dataWithDefaults.zip) {
+            throw new Error('Missing required fields for address')
           }
-          setLocalOptions(prev => ({
-            ...prev,
-            addresses: [...(prev.addresses || []), newAddress]
-          }))
-        }
+          newItem = await createAddress(dataWithDefaults as AddressInput)
+          break
+        case 'availability':
+          // Verify required fields are present
+          if (!dataWithDefaults.instructor_id) {
+            throw new Error('Missing required instructor_id for availability')
+          }
+          newItem = await createAvailability(dataWithDefaults as AvailabilityInput)
+          break
+        case 'booking':
+          // Verify required fields are present
+          if (!dataWithDefaults.client_id || !dataWithDefaults.instructor_id || 
+              !dataWithDefaults.pool_address_id || !dataWithDefaults.start_time || 
+              !dataWithDefaults.end_time) {
+            throw new Error('Missing required fields for booking')
+          }
+          newItem = await createBooking(dataWithDefaults as BookingInput)
+          break
+        default:
+          throw new Error(`Unknown table: ${table}`)
       }
-      
-      await onSuccess()
+
+      if (!newItem) {
+        throw new Error(`Failed to create ${table}`)
+      }
+
+      await onSuccess(newItem)
       onClose()
     } catch (error: any) {
       console.error('Error creating item:', error)
@@ -293,33 +302,31 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
     
     // Check if the field is a foreign key relation (has '_id' in the name)
     if (field.key.includes('_id') && field.relatedTable) {
+      // Skip rendering the home_address_id field if we have nested selections for addresses
+      if (field.key === 'home_address_id' && nestedSelections?.some(nested => nested.table === 'address')) {
+        return null
+      }
+      
       return (
         <JoinCreateOrSelect
           value={value}
-          onChange={(newValue) => handleChange(field.key, newValue)}
+          onChange={(newValue) => {
+            handleChange(field.key, newValue)
+            // If this is a nested selection, update the parent form data
+            if (nestedSelections?.some(nested => nested.table === field.relatedTable)) {
+              handleChange('home_address_id', newValue)
+            }
+          }}
           relatedTable={field.relatedTable}
           options={field.options || []}
           label={field.label}
           required={field.required}
           onItemCreated={(newItem) => {
-            // Update local options when a related item is created
-            if (field.relatedTable === 'client') {
-              setLocalOptions(prev => ({
-                ...prev,
-                clients: [...(prev.clients || []), newItem]
-              }))
-            } else if (field.relatedTable === 'instructor') {
-              setLocalOptions(prev => ({
-                ...prev,
-                instructors: [...(prev.instructors || []), newItem]
-              }))
-            } else if (field.relatedTable === 'address') {
-              setLocalOptions(prev => ({
-                ...prev,
-                addresses: [...(prev.addresses || []), newItem]
-              }))
-            }
+            // Update form data with the newly created item's ID
+            handleChange(field.key, newItem.id)
           }}
+          nestedSelections={nestedSelections}
+          addresses={localOptions.addresses}
         />
       )
     }

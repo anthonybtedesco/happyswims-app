@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import CreateItem from './CreateItem'
-import { supabase } from '@/lib/supabase/client'
+import { useData } from '@/lib/context/DataContext'
 
 interface JoinCreateOrSelectProps {
   value: string
@@ -10,6 +10,13 @@ interface JoinCreateOrSelectProps {
   label: string
   required?: boolean
   onItemCreated?: (newItem: any) => void
+  nestedSelections?: {
+    table: string
+    label: string
+    options: { value: string; label: string }[]
+    onItemCreated?: (newItem: any) => void
+  }[]
+  addresses?: any[]
 }
 
 export default function JoinCreateOrSelect({
@@ -19,9 +26,41 @@ export default function JoinCreateOrSelect({
   options,
   label,
   required,
-  onItemCreated
+  onItemCreated,
+  nestedSelections,
+  addresses
 }: JoinCreateOrSelectProps) {
+  const { clients, instructors, addresses: contextAddresses } = useData();
   const [isCreatingNew, setIsCreatingNew] = useState(false)
+  const [selectedNestedValue, setSelectedNestedValue] = useState<string>('')
+  const [localOptions, setLocalOptions] = useState(options)
+  
+  useEffect(() => {
+    setLocalOptions(options)
+  }, [options])
+
+  // Update options when data changes in context
+  useEffect(() => {
+    if (relatedTable === 'client' && clients.length > 0) {
+      const clientOptions = clients.map(client => ({
+        value: client.id,
+        label: `${client.first_name} ${client.last_name}`
+      }))
+      setLocalOptions(clientOptions)
+    } else if (relatedTable === 'instructor' && instructors.length > 0) {
+      const instructorOptions = instructors.map(instructor => ({
+        value: instructor.id,
+        label: `${instructor.first_name} ${instructor.last_name}`
+      }))
+      setLocalOptions(instructorOptions)
+    } else if (relatedTable === 'address' && contextAddresses.length > 0) {
+      const addressOptions = contextAddresses.map(address => ({
+        value: address.id,
+        label: `${address.address_line}, ${address.city}, ${address.state} ${address.zip}`
+      }))
+      setLocalOptions(addressOptions)
+    }
+  }, [relatedTable, clients, instructors, contextAddresses])
   
   function handleSelectChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const newValue = e.target.value
@@ -32,58 +71,42 @@ export default function JoinCreateOrSelect({
     }
   }
   
+  function handleNestedSelectChange(value: string) {
+    setSelectedNestedValue(value)
+  }
+  
   function handleCloseCreate() {
     setIsCreatingNew(false)
   }
   
-  async function handleCreateSuccess() {
+  async function handleCreateSuccess(newItem: any) {
     setIsCreatingNew(false)
     
-    // Fetch the latest record based on the related table
-    try {
-      let query = supabase
-        .from(relatedTable)
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      // Adapt query based on table type to get the right fields
-      if (relatedTable === 'client' || relatedTable === 'instructor') {
-        query = supabase
-          .from(relatedTable)
-          .select('id, first_name, last_name')
-          .order('created_at', { ascending: false })
-          .limit(1);
-      } else if (relatedTable === 'address') {
-        query = supabase
-          .from(relatedTable)
-          .select('id, address_line')
-          .order('created_at', { ascending: false })
-          .limit(1);
-      }
-      
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Error fetching newly created item:', error);
-        return Promise.resolve();
-      }
-      
-      if (data && data.length > 0) {
-        const newItem = data[0];
-        // Set the value to the newly created item's ID
-        onChange(newItem.id);
-        
-        // Notify parent component that a new item was created
-        if (onItemCreated) {
-          onItemCreated(newItem);
-        }
-      }
-    } catch (error) {
-      console.error('Error in handleCreateSuccess:', error);
+    // Create the new option
+    const newOption = {
+      value: newItem.id,
+      label: relatedTable === 'address' 
+        ? newItem.address_line 
+        : `${newItem.first_name} ${newItem.last_name}`
     }
     
-    return Promise.resolve();
+    // Update local options immediately
+    setLocalOptions(prev => {
+      const exists = prev.some(opt => opt.value === newOption.value)
+      if (!exists) {
+        return [...prev, newOption]
+      }
+      return prev
+    })
+    
+    // Select the new item
+    onChange(newItem.id)
+    
+    if (onItemCreated) {
+      onItemCreated(newItem)
+    }
+    
+    return Promise.resolve()
   }
   
   if (isCreatingNew) {
@@ -114,6 +137,8 @@ export default function JoinCreateOrSelect({
             onClose={handleCloseCreate}
             onSuccess={handleCreateSuccess}
             noForm={true}
+            nestedSelections={nestedSelections}
+            options={{addresses: addresses || contextAddresses}}
           />
         </div>
       </div>
@@ -130,13 +155,26 @@ export default function JoinCreateOrSelect({
         style={{ backgroundColor: '#f5f5f5', color: '#000' }}
       >
         <option value="">Select {label}...</option>
-        {options.map(option => (
+        {localOptions.map(option => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>
         ))}
         <option value="create_new">+ Create New {label}</option>
       </select>
+      
+      {nestedSelections && nestedSelections.map((nested, index) => (
+        <div key={index} style={{ marginTop: '1rem' }}>
+          <JoinCreateOrSelect
+            value={selectedNestedValue}
+            onChange={handleNestedSelectChange}
+            relatedTable={nested.table}
+            options={nested.options}
+            label={nested.label}
+            onItemCreated={nested.onItemCreated}
+          />
+        </div>
+      ))}
     </div>
   )
 } 

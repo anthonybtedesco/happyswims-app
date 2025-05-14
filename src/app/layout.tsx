@@ -5,6 +5,7 @@ import { colors } from "@/lib/colors";
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@/lib/debug/environment'
 import GoogleApiScript from '@/components/GoogleApiScript'
+import { DataProvider } from '@/lib/context/DataContext'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,7 +38,9 @@ export default function RootLayout({
           color: colors.text.primary
         }}
         className={`${geistSans.variable} ${geistMono.variable}`}>
-        {children}
+        <DataProvider>
+          {children}
+        </DataProvider>
       </body>
     </html>
   );
