@@ -1,16 +1,16 @@
 'use client'
 
-import React from 'react'
-import { Address, Instructor, Client, Availability } from '@/lib/types/supabase'
+import React, { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
+import { useData } from '@/lib/context/DataContext'
 import MapComponent from '@/lib/mapbox/MapComponent'
 import './DataTab.css'
 
-// Import the new components
+// Import components for the data view
 import DataTable from '@/components/DataTable'
 import SearchBar from '@/components/SearchBar'
 import CollapsiblePanel from '@/components/CollapsiblePanel'
 import CalendarView from '@/components/CalendarView'
-import DataManager from '@/components/DataManager'
 import TabNavigation from '@/components/TabNavigation'
 import DeleteButton from '@/components/buttons/DeleteButton'
 import AddButton from '@/components/buttons/AddButton'
@@ -26,41 +26,22 @@ interface Tag {
   tag_id: string
 }
 
-interface DataTabProps {
-  clients: Client[]
-  instructors: Instructor[]
-  addresses: Address[]
-  bookings: any[]
-  availabilities: Availability[]
-  fetchData: () => Promise<void>
-}
+export default function DataTab() {
+  const { 
+    clients, 
+    instructors, 
+    addresses, 
+    bookings, 
+    availabilities,
+    loading 
+  } = useData();
 
-// Helper function to transform client tags to match the expected format
-function transformClientTags(tags: Array<{tag: {id: string, name: string, color: string}, tagId: string}> | undefined): Tag[] {
-  if (!tags || tags.length === 0) return []
-  return tags.map(item => ({
-    tag: item.tag,
-    tag_id: item.tagId
-  }))
-}
+  const [selectedTable, setSelectedTable] = useState('clients')
+  const [editingCell, setEditingCell] = useState<{rowId: string, column: string, value: string} | null>(null)
+  const [userEmails, setUserEmails] = useState<Record<string, string>>({})
+  const [selectedRows, setSelectedRows] = useState<string[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
 
-// Helper function to transform instructor/address/booking tags to match the expected format
-function transformOtherTags(tags: Array<{tag: {id: string, name: string, color: string}, tag_id: string}> | undefined): Tag[] {
-  if (!tags || tags.length === 0) return []
-  return tags.map(item => ({
-    tag: item.tag,
-    tag_id: item.tag_id
-  }))
-}
-
-export default function DataTab({
-  clients,
-  instructors,
-  addresses,
-  bookings,
-  availabilities,
-  fetchData
-}: DataTabProps) {
   // Define the available tabs
   const tabs = [
     { id: 'clients', label: 'Clients' },
@@ -70,9 +51,198 @@ export default function DataTab({
     { id: 'availabilities', label: 'Availabilities' }
   ]
 
+  // Helper function to transform client tags to match the expected format
+  function transformClientTags(tags: Array<{tag: {id: string, name: string, color: string}, tagId: string}> | undefined): Tag[] {
+    if (!tags || tags.length === 0) return []
+    return tags.map(item => ({
+      tag: item.tag,
+      tag_id: item.tagId
+    }))
+  }
+
+  // Helper function to transform instructor/address/booking tags to match the expected format
+  function transformOtherTags(tags: Array<{tag: {id: string, name: string, color: string}, tag_id: string}> | undefined): Tag[] {
+    if (!tags || tags.length === 0) return []
+    return tags.map(item => ({
+      tag: item.tag,
+      tag_id: item.tag_id
+    }))
+  }
+
+  useEffect(() => {
+    const fetchUserEmails = async () => {
+      const userIds = [...clients, ...instructors]
+        .map(u => u.user_id)
+        .filter(Boolean)
+      
+      if (userIds.length === 0) return
+      
+      try {
+        const response = await fetch('/api/auth/list-users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userIds }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch user emails')
+        }
+
+        setUserEmails(data.users)
+      } catch (error) {
+        console.error('Error fetching user emails:', error)
+      }
+    }
+
+    if (clients.length > 0 || instructors.length > 0) {
+      fetchUserEmails()
+    }
+  }, [clients, instructors])
+
+  const handleCellChange = async (e: React.ChangeEvent<HTMLInputElement>, rowId: string, column: string, table: string) => {
+    const value = e.target.value
+    setEditingCell({rowId, column, value})
+  }
+
+  const handleCellBlur = async () => {
+    if (!editingCell) return
+
+    try {
+      const { rowId, column, value } = editingCell
+      const { error } = await supabase
+        .from(selectedTable === 'clients' ? 'client' : 
+              selectedTable === 'instructors' ? 'instructor' :
+              selectedTable === 'bookings' ? 'booking' : 'address')
+        .update({ [column]: value })
+        .eq('id', rowId)
+
+      if (error) throw error
+    } catch (err: any) {
+      console.error('Error updating cell:', err)
+    }
+
+    setEditingCell(null)
+  }
+
+  const handleRowSelect = (rowId: string) => {
+    setSelectedRows(prev => {
+      if (prev.includes(rowId)) {
+        return prev.filter(id => id !== rowId)
+      }
+      return [...prev, rowId]
+    })
+  }
+
+  const handleSearch = (value: string) => {
+    setSearchQuery(value)
+  }
+
+  const handleTableChange = (tableId: string) => {
+    setSelectedTable(tableId)
+    setSelectedRows([]) // Clear selected rows when changing tables
+  }
+
+  const deleteSelectedRows = async () => {
+    if (selectedRows.length === 0) return
+
+    const tableName = selectedTable === 'clients' ? 'client' : 
+                      selectedTable === 'instructors' ? 'instructor' :
+                      selectedTable === 'bookings' ? 'booking' :
+                      selectedTable === 'addresses' ? 'address' : 'availability'
+
+    try {
+      const { error } = await supabase
+        .from(tableName)
+        .delete()
+        .in('id', selectedRows)
+
+      if (error) throw error
+
+      setSelectedRows([])
+    } catch (err: any) {
+      console.error(`Error deleting ${tableName}:`, err)
+    }
+  }
+
+  const filterData = (data: any[]) => {
+    if (!searchQuery) return data
+
+    const query = searchQuery.toLowerCase()
+    return data.filter(item => {
+      // Convert all values to strings and check if any contain the search query
+      return Object.values(item).some(value => {
+        if (value === null || value === undefined) return false
+        
+        // Handle nested objects (like finding client/instructor names in bookings)
+        if (typeof value === 'object') {
+          return Object.values(value).some(v => 
+            String(v).toLowerCase().includes(query)
+          )
+        }
+        
+        return String(value).toLowerCase().includes(query)
+      })
+    })
+  }
+
+  // Get filtered data based on search query
+  const getFilteredData = () => {
+    switch (selectedTable) {
+      case 'clients':
+        return filterData(clients)
+      case 'instructors':
+        return filterData(instructors)
+      case 'bookings':
+        return filterData(bookings)
+      case 'addresses':
+        return filterData(addresses)
+      case 'availabilities':
+        return filterData(availabilities)
+      default:
+        return []
+    }
+  }
+
+  // Get filtered addresses for the map
+  const getFilteredAddresses = () => {
+    if (selectedTable === 'addresses') {
+      return filterData(addresses)
+    }
+    return addresses
+  }
+
+  // Get calendar events based on filtered data
+  const getCalendarEvents = () => {
+    const filteredBookings = selectedTable === 'bookings' ? filterData(bookings) : bookings
+    const filteredAvailabilities = selectedTable === 'availabilities' ? filterData(availabilities) : availabilities
+
+    const events = [
+      ...filteredBookings.map(booking => ({
+        id: booking.id,
+        title: `Booking: ${booking.client_id}`,
+        start: booking.start_time,
+        end: booking.end_time,
+        backgroundColor: '#3b82f6'
+      })),
+      ...filteredAvailabilities.map(availability => ({
+        id: `avail-${availability.id}`,
+        title: `Available: ${availability.instructor_id}`,
+        start: availability.start_date,
+        end: availability.end_date,
+        backgroundColor: availability.color || '#10b981'
+      }))
+    ]
+
+    return events
+  }
+
   // Define columns for each table type
-  function getColumns(tableType: string, userEmails: Record<string, string>) {
-    switch (tableType) {
+  const getColumns = () => {
+    switch (selectedTable) {
       case 'clients':
         return [
           { key: 'id', header: 'ID' },
@@ -81,20 +251,26 @@ export default function DataTab({
           { 
             key: 'user_id', 
             header: 'Email',
-            render: function(row: Client) { return userEmails[row.user_id] || 'No email' }
+            render: (row: any) => userEmails[row.user_id] || 'No email'
           },
           { 
             key: 'home_address_id', 
             header: 'Home Address',
-            render: function(row: Client) {
-              return addresses.find(addr => addr.id === row.home_address_id)?.address_line || 'No address'
+            render: (row: any) => {
+              const addr = addresses.find((a: any) => a.id === row.home_address_id);
+              return addr ? addr.address_line : 'No address';
             }
           },
           {
             key: 'client_tag',
             header: 'Tags',
-            render: function(row: Client) { 
-              return <TagDisplay entityId={row.id} entityType="client" tags={transformClientTags(row.client_tag)} onTagChange={fetchData} />
+            render: (row: any) => { 
+              return <TagDisplay 
+                entityId={row.id} 
+                entityType="client" 
+                tags={transformClientTags(row.client_tag)} 
+                onTagChange={() => {}} 
+              />;
             }
           }
         ]
@@ -106,20 +282,26 @@ export default function DataTab({
           { 
             key: 'user_id', 
             header: 'Email',
-            render: function(row: Instructor) { return userEmails[row.user_id] || 'No email' }
+            render: (row: any) => userEmails[row.user_id] || 'No email'
           },
           { 
             key: 'home_address_id', 
             header: 'Home Address',
-            render: function(row: Instructor) {
-              return addresses.find(addr => addr.id === row.home_address_id)?.address_line || 'No address'
+            render: (row: any) => {
+              const addr = addresses.find((a: any) => a.id === row.home_address_id);
+              return addr ? addr.address_line : 'No address'; 
             }
           },
           {
             key: 'instructor_tag',
             header: 'Tags',
-            render: function(row: Instructor) { 
-              return <TagDisplay entityId={row.id} entityType="instructor" tags={transformOtherTags(row.instructor_tag)} onTagChange={fetchData} />
+            render: (row: any) => { 
+              return <TagDisplay 
+                entityId={row.id} 
+                entityType="instructor" 
+                tags={transformOtherTags(row.instructor_tag)} 
+                onTagChange={() => {}} 
+              />;
             }
           }
         ]
@@ -129,35 +311,40 @@ export default function DataTab({
           { 
             key: 'client_id', 
             header: 'Client',
-            render: function(row: any) {
-              const client = clients.find(c => c.id === row.client_id)
-              return client ? `${client.first_name} ${client.last_name}` : 'Unknown'
+            render: (row: any) => {
+              const client = clients.find((c: any) => c.id === row.client_id);
+              return client ? `${client.first_name} ${client.last_name}` : 'Unknown';
             }
           },
           { 
             key: 'instructor_id', 
             header: 'Instructor',
-            render: function(row: any) {
-              const instructor = instructors.find(i => i.id === row.instructor_id)
-              return instructor ? `${instructor.first_name} ${instructor.last_name}` : 'Unknown'
+            render: (row: any) => {
+              const instructor = instructors.find((i: any) => i.id === row.instructor_id);
+              return instructor ? `${instructor.first_name} ${instructor.last_name}` : 'Unknown';
             }
           },
           { 
-            key: 'start', 
+            key: 'start_time', 
             header: 'Start Time',
-            render: function(row: any) { return new Date(row.start).toLocaleString() }
+            render: (row: any) => new Date(row.start_time).toLocaleString()
           },
           { 
-            key: 'end', 
+            key: 'end_time', 
             header: 'End Time',
-            render: function(row: any) { return new Date(row.end).toLocaleString() }
+            render: (row: any) => new Date(row.end_time).toLocaleString()
           },
           { key: 'status', header: 'Status' },
           {
             key: 'booking_tag',
             header: 'Tags',
-            render: function(row: any) { 
-              return <TagDisplay entityId={row.id} entityType="booking" tags={transformOtherTags(row.booking_tag)} onTagChange={fetchData} />
+            render: (row: any) => {
+              return <TagDisplay 
+                entityId={row.id} 
+                entityType="booking" 
+                tags={transformOtherTags(row.booking_tag)} 
+                onTagChange={() => {}} 
+              />;
             }
           }
         ]
@@ -171,13 +358,18 @@ export default function DataTab({
           { 
             key: 'coordinates', 
             header: 'Coordinates',
-            render: function(row: Address) { return `(${row.latitude}, ${row.longitude})` }
+            render: (row: any) => `(${row.latitude}, ${row.longitude})`
           },
           {
             key: 'address_tag',
             header: 'Tags',
-            render: function(row: Address) { 
-              return <TagDisplay entityId={row.id} entityType="address" tags={transformOtherTags(row.address_tag)} onTagChange={fetchData} />
+            render: (row: any) => {
+              return <TagDisplay 
+                entityId={row.id} 
+                entityType="address" 
+                tags={transformOtherTags(row.address_tag)} 
+                onTagChange={() => {}} 
+              />;
             }
           }
         ]
@@ -187,43 +379,41 @@ export default function DataTab({
           { 
             key: 'instructor_id', 
             header: 'Instructor',
-            render: function(row: Availability) {
-              const instructor = instructors.find(i => i.id === row.instructor_id)
-              return instructor ? `${instructor.first_name} ${instructor.last_name}` : 'Unknown'
+            render: (row: any) => {
+              const instructor = instructors.find((i: any) => i.id === row.instructor_id);
+              return instructor ? `${instructor.first_name} ${instructor.last_name}` : 'Unknown';
             }
           },
           { 
             key: 'start_date', 
             header: 'Start Date',
-            render: function(row: Availability) { return new Date(row.start_date).toLocaleDateString() },
+            render: (row: any) => new Date(row.start_date).toLocaleDateString(),
             editable: true
           },
           { 
             key: 'end_date', 
             header: 'End Date',
-            render: function(row: Availability) { return new Date(row.end_date).toLocaleDateString() },
+            render: (row: any) => new Date(row.end_date).toLocaleDateString(),
             editable: true
           },
           { key: 'timerange', header: 'Time Range', editable: true },
           { 
             key: 'color', 
             header: 'Color',
-            render: function(row: Availability) {
-              return (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div 
-                    style={{ 
-                      width: '20px', 
-                      height: '20px', 
-                      backgroundColor: row.color || '#10b981',
-                      borderRadius: '4px',
-                      border: '1px solid #e2e8f0'
-                    }} 
-                  />
-                  {row.color || '#10b981'}
-                </div>
-              )
-            },
+            render: (row: any) => (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div 
+                  style={{ 
+                    width: '20px', 
+                    height: '20px', 
+                    backgroundColor: row.color || '#10b981',
+                    borderRadius: '4px',
+                    border: '1px solid #e2e8f0'
+                  }} 
+                />
+                {row.color || '#10b981'}
+              </div>
+            ),
             editable: true
           }
         ]
@@ -232,111 +422,106 @@ export default function DataTab({
     }
   }
 
+  // Get available tags for filtering
+  const getAvailableTags = () => {
+    return []
+  }
+
+  // Handle tag filter selection
+  const handleTagFilter = (tagIds: string[]) => {
+    // Implement tag filtering logic here
+    console.log('Filter by tags:', tagIds)
+  }
+
+  // Show loading state
+  if (loading.clients || loading.instructors || loading.addresses || loading.bookings || loading.availabilities) {
+    return <div>Loading data...</div>;
+  }
+
+  const filteredData = getFilteredData()
+  const filteredAddresses = getFilteredAddresses()
+  const calendarEvents = getCalendarEvents()
+
   return (
     <div className="data-tab">
-      <DataManager
-        clients={clients}
-        instructors={instructors}
-        addresses={addresses}
-        bookings={bookings}
-        availabilities={availabilities}
-        fetchData={fetchData}
-      >
-        {({ 
-          selectedTable, 
-          searchQuery, 
-          filteredData, 
-          filteredAddresses, 
-          selectedRows,
-          calendarEvents,
-          handleSearch, 
-          handleTableChange, 
-          handleRowSelect,
-          deleteSelectedRows,
-          userEmails,
-          handleTagFilter,
-          availableTags
-        }) => (
-          <>
-            <TabNavigation 
-              tabs={tabs} 
-              activeTab={selectedTable} 
-              onTabChange={handleTableChange} 
-            />
-            
-            <div className="tab-content">
-              <div className="layout-container">
-                <div className="data-section">
-                  <div className="search-and-actions">
-                    <div className="search-actions-left">
-                      <SearchBar 
-                        value={searchQuery} 
-                        onChange={handleSearch}
-                        placeholder={`Search ${selectedTable}...`}
-                        onTagFilter={handleTagFilter}
-                        availableTags={availableTags}
-                      />
-                      
-                      {selectedRows.length > 0 && (
-                        <DeleteButton 
-                          selectedCount={selectedRows.length} 
-                          onDelete={deleteSelectedRows}
-                          selectedRows={selectedRows}
-                          tableName={selectedTable === 'clients' ? 'client' : 
-                                    selectedTable === 'instructors' ? 'instructor' :
-                                    selectedTable === 'bookings' ? 'booking' :
-                                    selectedTable === 'addresses' ? 'address' : 'availability'}
-                        />
-                      )}
-                    </div>
-
-                    <div className="search-actions-right">
-                      <AddButton 
-                        table={selectedTable === 'clients' ? 'client' : 
-                              selectedTable === 'instructors' ? 'instructor' :
-                              selectedTable === 'bookings' ? 'booking' :
-                              selectedTable === 'addresses' ? 'address' : 'availability'}
-                        fetchData={fetchData}
-                        options={{
-                          clients,
-                          instructors,
-                          addresses
-                        }}
-                      />
-                    </div>
-                  </div>
+      <div>
+        <TabNavigation 
+          tabs={tabs} 
+          activeTab={selectedTable} 
+          onTabChange={handleTableChange} 
+        />
+        
+        <div className="tab-content">
+          <div className="layout-container">
+            <div className="data-section">
+              <div className="search-and-actions">
+                <div className="search-actions-left">
+                  <SearchBar 
+                    value={searchQuery} 
+                    onChange={handleSearch}
+                    placeholder={`Search ${selectedTable}...`}
+                    onTagFilter={handleTagFilter}
+                    availableTags={[]}
+                  />
                   
-                  <DataTable 
-                    data={filteredData}
-                    columns={getColumns(selectedTable, userEmails)}
-                    tableName={selectedTable === 'clients' ? 'client' : 
-                              selectedTable === 'instructors' ? 'instructor' :
-                              selectedTable === 'bookings' ? 'booking' :
-                              selectedTable === 'addresses' ? 'address' : 'availability'}
-                    onRowSelect={handleRowSelect}
-                    selectedRows={selectedRows}
-                    fetchData={fetchData}
+                  {selectedRows.length > 0 && (
+                    <DeleteButton 
+                      selectedCount={selectedRows.length} 
+                      onDelete={deleteSelectedRows}
+                      selectedRows={selectedRows}
+                      tableName={selectedTable === 'clients' ? 'client' : 
+                                selectedTable === 'instructors' ? 'instructor' :
+                                selectedTable === 'bookings' ? 'booking' :
+                                selectedTable === 'addresses' ? 'address' : 'availability'}
+                    />
+                  )}
+                </div>
+
+                <div className="search-actions-right">
+                  <AddButton 
+                    table={selectedTable === 'clients' ? 'client' : 
+                          selectedTable === 'instructors' ? 'instructor' :
+                          selectedTable === 'bookings' ? 'booking' :
+                          selectedTable === 'addresses' ? 'address' : 'availability'}
+                    fetchData={async () => Promise.resolve()}
+                    options={{
+                      clients,
+                      instructors,
+                      addresses
+                    }}
                   />
                 </div>
-                
-                <div className="views-section">
-                  <CollapsiblePanel title="Map View">
-                    <MapComponent
-                      addresses={filteredAddresses}
-                      height="300px"
-                      defaultMarkerColor="#4BB543"
-                    />
-                  </CollapsiblePanel>
-                  
-                  <CollapsiblePanel title="Calendar View">
-                    <CalendarView events={calendarEvents} />
-                  </CollapsiblePanel>
-                </div>
               </div>
+              
+              <DataTable 
+                data={filteredData}
+                columns={getColumns()}
+                tableName={selectedTable === 'clients' ? 'client' : 
+                          selectedTable === 'instructors' ? 'instructor' :
+                          selectedTable === 'bookings' ? 'booking' :
+                          selectedTable === 'addresses' ? 'address' : 'availability'}
+                onRowSelect={handleRowSelect}
+                selectedRows={selectedRows}
+                fetchData={async () => Promise.resolve()}
+              />
             </div>
-          </>
-        )}
-      </DataManager>
+            
+            <div className="views-section">
+              <CollapsiblePanel title="Map View">
+                <MapComponent
+                  addresses={filteredAddresses}
+                  height="300px"
+                  defaultMarkerColor="#4BB543"
+                />
+              </CollapsiblePanel>
+              
+              <CollapsiblePanel title="Calendar View">
+                <CalendarView events={calendarEvents} />
+              </CollapsiblePanel>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 } 

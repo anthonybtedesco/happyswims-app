@@ -52,11 +52,33 @@ type InstructorAvailability = {
 }
 
 const COLORS = [
-  '#FF6B6B', '#4ECDC4', '#45B7D1', 
-  '#96CEB4', '#FFEEAD', '#D4A5A5'
+  '#FF6B6B', // Coral Red
+  '#4ECDC4', // Turquoise
+  '#45B7D1', // Sky Blue
+  '#96CEB4', // Sage Green
+  '#FFEEAD', // Cream Yellow
+  '#D4A5A5', // Dusty Rose
+  '#7986CB', // Cornflower Blue
+  '#9575CD', // Medium Purple
+  '#64B5F6', // Light Blue
+  '#4DB6AC', // Teal
+  '#81C784', // Light Green
+  '#DCE775', // Lime
+  '#FFD54F', // Amber
+  '#FF8A65', // Light Orange
+  '#A1887F', // Brown
+  '#90A4AE', // Blue Grey
+  '#F06292', // Pink
+  '#7E57C2', // Deep Purple
+  '#26A69A', // Teal Green
+  '#FFA726'  // Orange
 ];
 
-export default function InstructorDashboard() {
+interface AvailabilityProps {
+  instructorId?: string;
+}
+
+export default function Availability({ instructorId }: AvailabilityProps) {
   const [timeRanges, setTimeRanges] = useState<TimeRange[]>([{
     id: '1',
     splits: [{
@@ -70,49 +92,17 @@ export default function InstructorDashboard() {
   const [patterns, setPatterns] = useState<AvailabilityPattern[]>([]);
   const [selectedTimeRange, setSelectedTimeRange] = useState<string>('1');
   const [selectedType, setSelectedType] = useState<'days' | 'weeks' | 'months' | 'weekends'>('days');
-  const [instructorId, setInstructorId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isEdited, setIsEdited] = useState(false);
 
-  // Fetch instructor ID on component mount
+  // Load existing availability when instructorId changes
   useEffect(() => {
-    async function fetchInstructorId() {
-      try {
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          setSaveError('You must be logged in to manage availability');
-          return;
-        }
-        
-        // Get instructor ID for the current user
-        const { data: instructorData, error: instructorError } = await supabase
-          .from('instructor')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (instructorError) {
-          console.error('Error fetching instructor:', instructorError);
-          setSaveError('Failed to find instructor profile');
-          return;
-        }
-        
-        setInstructorId(instructorData.id);
-        
-        // Load existing availability patterns
-        await loadAvailability(instructorData.id);
-      } catch (err) {
-        console.error('Error in initialization:', err);
-        setSaveError('Failed to initialize availability');
-      }
+    if (instructorId) {
+      loadAvailability(instructorId);
     }
-    
-    fetchInstructorId();
-  }, []);
+  }, [instructorId]);
 
   // Load existing availability from Supabase
   const loadAvailability = async (instructorId: string) => {
@@ -156,7 +146,7 @@ export default function InstructorDashboard() {
             
             timeRangeMap.set(timeRangeId, {
               id: timeRangeId,
-              color: item.color || COLORS[timeRangeMap.size % COLORS.length],
+              color: COLORS[timeRangeMap.size % COLORS.length],
               splits
             });
           }
@@ -208,20 +198,21 @@ export default function InstructorDashboard() {
         const timeRange = timeRanges.find(r => r.id === pattern.timeRangeId);
         if (!timeRange) continue;
         
-        const timeRangeStr = timeRange.splits.map(split => 
-          `${split.startTime}-${split.endTime}`
-        ).join(',');
-        
-        await supabase
-          .from('availability')
-          .insert({
-            id: pattern.id,
-            instructor_id: instructorId,
-            start_date: pattern.start,
-            end_date: pattern.end,
-            timerange: timeRangeStr,
-            color: timeRange.color
-          });
+        // Create a separate availability entry for each time split
+        for (const split of timeRange.splits) {
+          const timeRangeStr = `${split.startTime}-${split.endTime}`;
+          
+          await supabase
+            .from('availability')
+            .insert({
+              id: uuidv4(), // Generate a new ID for each availability entry
+              instructor_id: instructorId,
+              start_date: pattern.start,
+              end_date: pattern.end,
+              timerange: timeRangeStr,
+              color: timeRange.color
+            });
+        }
       }
       
       setSaveSuccess(true);
@@ -637,28 +628,66 @@ export default function InstructorDashboard() {
                 <div>
                   <label style={{ 
                     display: 'block', 
-                    marginBottom: '0.5rem' 
+                    marginBottom: '0.5rem',
+                    fontWeight: '500'
                   }}>
                     Select Time Range
                   </label>
-                  <select
-                    value={selectedTimeRange}
-                    onChange={(e) => setSelectedTimeRange(e.target.value)}
-                    style={{ 
-                      width: '100%', 
-                      padding: '0.5rem', 
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '0.375rem'
-                    }}
-                  >
-                    {timeRanges.map(range => (
-                      <option key={range.id} value={range.id}>
-                        {range.splits.map(split => 
-                          `${split.startTime} - ${split.endTime}`
-                        ).join(', ')}
-                      </option>
-                    ))}
-                  </select>
+                  <div style={{
+                    position: 'relative',
+                    width: '100%'
+                  }}>
+                    <select
+                      value={selectedTimeRange}
+                      onChange={(e) => setSelectedTimeRange(e.target.value)}
+                      style={{ 
+                        width: '100%', 
+                        padding: '0.75rem', 
+                        paddingLeft: '2.5rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '0.375rem',
+                        appearance: 'none',
+                        backgroundColor: colors.common.white,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {timeRanges.map(range => (
+                        <option key={range.id} value={range.id}>
+                          {range.splits.map(split => 
+                            `${split.startTime} - ${split.endTime}`
+                          ).join(', ')}
+                        </option>
+                      ))}
+                    </select>
+                    <div style={{
+                      position: 'absolute',
+                      left: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '1rem',
+                      height: '1rem',
+                      borderRadius: '0.25rem',
+                      backgroundColor: timeRanges.find(r => r.id === selectedTimeRange)?.color || COLORS[0]
+                    }} />
+                    <div style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none'
+                    }}>
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  </div>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: colors.text.secondary,
+                    marginTop: '0.5rem'
+                  }}>
+                    Select a time range before choosing dates on the calendar
+                  </p>
                 </div>
 
                 <div>

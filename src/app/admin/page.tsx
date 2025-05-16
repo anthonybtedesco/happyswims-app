@@ -2,26 +2,23 @@
 
 import React, { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Address, Instructor, Client, Availability, Booking } from '@/lib/types/supabase'
 import { Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import HomeTab from './tabs/HomeTab'
 import DataTab from './tabs/DataTab'
 import CalendarSettingsModal from '@/components/modals/CalendarSettingsModal'
+import BookTab from './tabs/BookTab'
+import InstructorTab from './tabs/InstructorTab'
+import { useData } from '@/lib/context/DataContext'
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('home')
   const [showSettingsModal, setShowSettingsModal] = useState(false)
-  const [users, setUsers] = useState<any[]>([])
-  const [instructors, setInstructors] = useState<Instructor[]>([])
-  const [clients, setClients] = useState<Client[]>([])
-  const [addresses, setAddresses] = useState<Address[]>([])
-  const [bookings, setBookings] = useState<Booking[]>([])
-  const [availabilities, setAvailabilities] = useState<Availability[]>([])
-
+  
+  const { bookings, availabilities } = useData()
+  
+  // Subscribe to changes
   useEffect(() => {
-    fetchData()
-
     const bookingSubscription = supabase
       .channel('bookings-channel')
       .on(
@@ -32,7 +29,7 @@ export default function AdminDashboard() {
           table: 'booking'
         },
         () => {
-          fetchData()
+          // Changes will be handled by DataContext
         }
       )
       .subscribe()
@@ -40,32 +37,7 @@ export default function AdminDashboard() {
     return () => {
       bookingSubscription.unsubscribe()
     }
-
   }, [])
-
-  const fetchData = async () => {
-    const [userData, instructorData, clientData, addressData, bookingData, availabilityData] = await Promise.all([
-      supabase.from('client').select('*'),
-      supabase.from('instructor').select('*, instructor_tag(tag_id, tag(id, name, color))'),
-      supabase.from('client').select('*, client_tag(tag_id, tag(id, name, color))'),
-      supabase.from('address').select('*, address_tag(tag_id, tag(id, name, color))'),
-      supabase.from('booking').select(`*, booking_tag(tag_id, tag(id, name, color))`),
-      supabase.from('availability').select(`*`)
-    ])
-
-    console.log("bookingData.data", bookingData.data)
-    console.log("userData.data", userData.data)
-    console.log("instructorData.data", instructorData.data)
-    console.log("clientData.data", clientData.data)
-    console.log("addressData.data", addressData.data)
-    console.log("availabilityData.data", availabilityData.data)
-    if (userData.data) setUsers(userData.data)
-    if (instructorData.data) setInstructors(instructorData.data)
-    if (clientData.data) setClients(clientData.data)
-    if (addressData.data) setAddresses(addressData.data)
-    if (bookingData.data) setBookings(bookingData.data)
-    if (availabilityData.data) setAvailabilities(availabilityData.data)
-  }
 
   return (
     <main style={{ padding: '2rem' }}>
@@ -103,6 +75,32 @@ export default function AdminDashboard() {
             >
               Data
             </button>
+            <button 
+              onClick={() => setActiveTab('book')}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: activeTab === 'book' ? '#f0f0f0' : 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'book' ? '2px solid #0070f3' : 'none',
+                cursor: 'pointer',
+                fontWeight: activeTab === 'book' ? 'bold' : 'normal',
+              }}
+            > 
+              Book
+            </button>
+            <button 
+              onClick={() => setActiveTab('instructor')}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: activeTab === 'instructor' ? '#f0f0f0' : 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'instructor' ? '2px solid #0070f3' : 'none',
+                cursor: 'pointer',
+                fontWeight: activeTab === 'instructor' ? 'bold' : 'normal',
+              }}
+            >  
+              Instructor
+            </button> 
           </div>
           <Button 
             variant="ghost" 
@@ -122,31 +120,11 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {activeTab === 'home' && (
-        <HomeTab 
-          users={users}
-          clients={clients}
-          instructors={instructors}
-          addresses={addresses}
-          bookings={bookings}
-          availabilities={availabilities}
-          fetchData={fetchData}
-        />
-      )}
-
-      {activeTab === 'data' && 
-        (instructors && addresses && bookings && availabilities && fetchData && (
-          <DataTab
-            clients={clients}
-            instructors={instructors}
-            addresses={addresses}
-            bookings={bookings}
-            availabilities={availabilities}
-            fetchData={fetchData}
-          />
-        )
-      )}
-
+      {activeTab === 'home' && <HomeTab />}
+      {activeTab === 'data' && <DataTab />}
+      {activeTab === 'book' && <BookTab />}
+      {activeTab === 'instructor' && <InstructorTab />}
+      
       <CalendarSettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
