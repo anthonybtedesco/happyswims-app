@@ -5,10 +5,17 @@ import { supabase } from '@/lib/supabase/client'
 
 type AuthMethod = 'email' | 'phone' | 'email-otp' | 'phone-otp'
 
+const ADMIN_EMAILS = [
+  'kayla@happyswims.life',
+  'santiago@happyswims.life',
+  'team@agfarms.dev'
+]
+
 export default function AdminOTPForm() {
   const [otp, setOtp] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [selectedEmail, setSelectedEmail] = useState(ADMIN_EMAILS[0])
   const [step, setStep] = useState<AuthMethod>('email')
   const [error, setError] = useState<string | null>(null)
   const [consentChecked, setConsentChecked] = useState(false)
@@ -19,7 +26,7 @@ export default function AdminOTPForm() {
       const response = await fetch('/api/admin/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: process.env.NEXT_PUBLIC_ADMIN_EMAIL })
+        body: JSON.stringify({ email: selectedEmail })
       })
 
       if (response.ok) {
@@ -67,7 +74,7 @@ export default function AdminOTPForm() {
     if (step === 'email-otp') {
       try {
         const { data, error } = await supabase.auth.verifyOtp({
-          email: process.env.NEXT_PUBLIC_ADMIN_EMAIL!,
+          email: selectedEmail,
           token: otp,
           type: 'magiclink'
         })
@@ -181,6 +188,29 @@ export default function AdminOTPForm() {
 
           {step === 'email' ? (
             <div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                  Select Admin Email:
+                </label>
+                <select
+                  value={selectedEmail}
+                  onChange={(e) => setSelectedEmail(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '4px',
+                    border: '1px solid #ddd',
+                    fontSize: '1rem',
+                    marginBottom: '1rem'
+                  }}
+                >
+                  {ADMIN_EMAILS.map((adminEmail) => (
+                    <option key={adminEmail} value={adminEmail}>
+                      {adminEmail}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <p style={{ marginBottom: '1rem', fontSize: '0.875rem' }}>
                 Click below to receive an OTP via email
               </p>

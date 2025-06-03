@@ -33,6 +33,7 @@ export default function DataTab() {
     addresses, 
     bookings, 
     availabilities,
+    students,
     loading 
   } = useData();
 
@@ -46,6 +47,7 @@ export default function DataTab() {
   const tabs = [
     { id: 'clients', label: 'Clients' },
     { id: 'instructors', label: 'Instructors' },
+    { id: 'students', label: 'Students' },
     { id: 'bookings', label: 'Bookings' },
     { id: 'addresses', label: 'Addresses' },
     { id: 'availabilities', label: 'Availabilities' }
@@ -116,6 +118,7 @@ export default function DataTab() {
       const { error } = await supabase
         .from(selectedTable === 'clients' ? 'client' : 
               selectedTable === 'instructors' ? 'instructor' :
+              selectedTable === 'students' ? 'student' :
               selectedTable === 'bookings' ? 'booking' : 'address')
         .update({ [column]: value })
         .eq('id', rowId)
@@ -151,6 +154,7 @@ export default function DataTab() {
 
     const tableName = selectedTable === 'clients' ? 'client' : 
                       selectedTable === 'instructors' ? 'instructor' :
+                      selectedTable === 'students' ? 'student' :
                       selectedTable === 'bookings' ? 'booking' :
                       selectedTable === 'addresses' ? 'address' : 'availability'
 
@@ -196,6 +200,8 @@ export default function DataTab() {
         return filterData(clients)
       case 'instructors':
         return filterData(instructors)
+      case 'students':
+        return filterData(students)
       case 'bookings':
         return filterData(bookings)
       case 'addresses':
@@ -300,6 +306,37 @@ export default function DataTab() {
                 entityId={row.id} 
                 entityType="instructor" 
                 tags={transformOtherTags(row.instructor_tag)} 
+                onTagChange={() => {}} 
+              />;
+            }
+          }
+        ]
+      case 'students':
+        return [
+          { key: 'id', header: 'ID' },
+          { key: 'first_name', header: 'First Name', editable: true },
+          { 
+            key: 'client_id', 
+            header: 'Client',
+            render: (row: any) => {
+              const client = clients.find((c: any) => c.id === row.client_id);
+              return client ? `${client.first_name} ${client.last_name}` : 'Unknown';
+            }
+          },
+          { 
+            key: 'birthdate', 
+            header: 'Birth Date',
+            render: (row: any) => new Date(row.birthdate).toLocaleDateString(),
+            editable: true
+          },
+          {
+            key: 'student_tag',
+            header: 'Tags',
+            render: (row: any) => {
+              return <TagDisplay 
+                entityId={row.id} 
+                entityType="student" 
+                tags={transformOtherTags(row.student_tag)} 
                 onTagChange={() => {}} 
               />;
             }
@@ -434,7 +471,7 @@ export default function DataTab() {
   }
 
   // Show loading state
-  if (loading.clients || loading.instructors || loading.addresses || loading.bookings || loading.availabilities) {
+  if (loading.clients || loading.instructors || loading.addresses || loading.bookings || loading.availabilities || loading.students) {
     return <div>Loading data...</div>;
   }
 
@@ -471,6 +508,7 @@ export default function DataTab() {
                       selectedRows={selectedRows}
                       tableName={selectedTable === 'clients' ? 'client' : 
                                 selectedTable === 'instructors' ? 'instructor' :
+                                selectedTable === 'students' ? 'student' :
                                 selectedTable === 'bookings' ? 'booking' :
                                 selectedTable === 'addresses' ? 'address' : 'availability'}
                     />
@@ -481,6 +519,7 @@ export default function DataTab() {
                   <AddButton 
                     table={selectedTable === 'clients' ? 'client' : 
                           selectedTable === 'instructors' ? 'instructor' :
+                          selectedTable === 'students' ? 'student' :
                           selectedTable === 'bookings' ? 'booking' :
                           selectedTable === 'addresses' ? 'address' : 'availability'}
                     fetchData={async () => Promise.resolve()}
@@ -498,6 +537,7 @@ export default function DataTab() {
                 columns={getColumns()}
                 tableName={selectedTable === 'clients' ? 'client' : 
                           selectedTable === 'instructors' ? 'instructor' :
+                          selectedTable === 'students' ? 'student' :
                           selectedTable === 'bookings' ? 'booking' :
                           selectedTable === 'addresses' ? 'address' : 'availability'}
                 onRowSelect={handleRowSelect}

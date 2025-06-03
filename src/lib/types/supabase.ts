@@ -156,7 +156,9 @@ export type Availability = Database['public']['Tables']['availability']['Row']
 export type Booking = Database['public']['Tables']['booking']['Row'] & {
   booking_tag?: Array<{tag: {id: string, name: string, color: string}, tag_id: string}>
 }
-export type Student = Database['public']['Tables']['student']['Row']
+export type Student = Database['public']['Tables']['student']['Row'] & {
+  student_tag?: Array<{tag: {id: string, name: string, color: string}, tag_id: string}>
+}
 
 export type ClientInsert = Database['public']['Tables']['client']['Insert']
 export type InstructorInsert = Database['public']['Tables']['instructor']['Insert']

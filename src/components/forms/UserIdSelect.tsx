@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 interface UserIdSelectProps {
   value: string
@@ -14,7 +15,9 @@ export default function UserIdSelect({ value, onChange, required }: UserIdSelect
   const [creatingUser, setCreatingUser] = useState(false)
   const [newUserEmail, setNewUserEmail] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 })
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLDivElement>(null)
   
   // Fetch all users on component mount
   useEffect(() => {
@@ -24,7 +27,8 @@ export default function UserIdSelect({ value, onChange, required }: UserIdSelect
   // Handle clicks outside the dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) &&
+          triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
         setShowDropdown(false)
       }
     }
@@ -34,6 +38,18 @@ export default function UserIdSelect({ value, onChange, required }: UserIdSelect
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [])
+
+  // Calculate dropdown position when showing
+  useEffect(() => {
+    if (showDropdown && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setDropdownPosition({
+        top: rect.bottom + window.scrollY + 4,
+        left: rect.left + window.scrollX,
+        width: rect.width
+      })
+    }
+  }, [showDropdown])
   
   async function fetchUsers() {
     setIsLoading(true)
@@ -107,12 +123,113 @@ export default function UserIdSelect({ value, onChange, required }: UserIdSelect
   
   // Find selected user's email
   const selectedUserEmail = users.find(user => user.id === value)?.email || ''
+
+  // Dropdown component to be rendered in portal
+  const DropdownPortal = () => {
+    if (!showDropdown) return null
+
+    return createPortal(
+      <div
+        ref={dropdownRef}
+        className="dropdown-menu"
+        style={{
+          position: 'fixed',
+          top: dropdownPosition.top,
+          left: dropdownPosition.left,
+          width: dropdownPosition.width,
+          zIndex: 10000,
+          backgroundColor: 'white',
+          borderRadius: '6px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          border: '1px solid #d1d5db',
+          maxHeight: '300px',
+          overflowY: 'auto'
+        }}
+      >
+        <div className="search-container" style={{ padding: '8px' }}>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by email..."
+            className="search-input"
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              fontSize: '14px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+            autoFocus
+          />
+        </div>
+        
+        <div className="options-container" style={{ padding: '8px 0' }}>
+          {isLoading ? (
+            <div
+              className="loading"
+              style={{
+                padding: '8px 12px',
+                color: '#6b7280',
+                fontSize: '14px',
+                textAlign: 'center'
+              }}
+            >
+              Loading users...
+            </div>
+          ) : filteredUsers.length > 0 ? (
+            filteredUsers.map(user => (
+              <div
+                key={user.id}
+                className={`option ${user.id === value ? 'selected' : ''}`}
+                onClick={() => {
+                  onChange(user.id)
+                  setShowDropdown(false)
+                }}
+                style={{
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  backgroundColor: user.id === value ? '#f3f4f6' : 'transparent',
+                  color: '#000',
+                  fontSize: '14px',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f9fafb'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = user.id === value ? '#f3f4f6' : 'transparent'
+                }}
+              >
+                {user.email}
+              </div>
+            ))
+          ) : (
+            <div
+              className="no-options"
+              style={{
+                padding: '8px 12px',
+                color: '#6b7280',
+                fontSize: '14px',
+                textAlign: 'center'
+              }}
+            >
+              No users found
+            </div>
+          )}
+        </div>
+      </div>,
+      document.body
+    )
+  }
   
   return (
-    <div className="user-id-select" ref={dropdownRef} style={{ position: 'relative' }}>
+    <div className="user-id-select" style={{ position: 'relative' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <div 
+            ref={triggerRef}
             className="selected-user" 
             onClick={() => setShowDropdown(!showDropdown)}
             style={{
@@ -162,99 +279,7 @@ export default function UserIdSelect({ value, onChange, required }: UserIdSelect
           </button>
         </div>
         
-        {showDropdown && (
-          <div
-            className="dropdown-menu"
-            style={{
-              position: 'absolute',
-              top: '40px',
-              left: 0,
-              right: 0,
-              zIndex: 10,
-              backgroundColor: 'white',
-              borderRadius: '6px',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              border: '1px solid #d1d5db',
-              marginTop: '4px',
-              maxHeight: '300px',
-              overflowY: 'auto'
-            }}
-          >
-            <div className="search-container" style={{ padding: '8px' }}>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by email..."
-                className="search-input"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
-                onClick={(e) => e.stopPropagation()}
-                autoFocus
-              />
-            </div>
-            
-            <div className="options-container" style={{ padding: '8px 0' }}>
-              {isLoading ? (
-                <div
-                  className="loading"
-                  style={{
-                    padding: '8px 12px',
-                    color: '#6b7280',
-                    fontSize: '14px',
-                    textAlign: 'center'
-                  }}
-                >
-                  Loading users...
-                </div>
-              ) : filteredUsers.length > 0 ? (
-                filteredUsers.map(user => (
-                  <div
-                    key={user.id}
-                    className={`option ${user.id === value ? 'selected' : ''}`}
-                    onClick={() => {
-                      onChange(user.id)
-                      setShowDropdown(false)
-                    }}
-                    style={{
-                      padding: '8px 12px',
-                      cursor: 'pointer',
-                      backgroundColor: user.id === value ? '#f3f4f6' : 'transparent',
-                      color: '#000',
-                      fontSize: '14px',
-                      transition: 'background-color 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f9fafb'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = user.id === value ? '#f3f4f6' : 'transparent'
-                    }}
-                  >
-                    {user.email}
-                  </div>
-                ))
-              ) : (
-                <div
-                  className="no-options"
-                  style={{
-                    padding: '8px 12px',
-                    color: '#6b7280',
-                    fontSize: '14px',
-                    textAlign: 'center'
-                  }}
-                >
-                  No users found
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        <DropdownPortal />
         
         {creatingUser && (
           <div style={{ 

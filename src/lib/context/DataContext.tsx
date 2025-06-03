@@ -1,7 +1,20 @@
 'use client'
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Instructor, Client, Address, Availability, Booking } from '@/lib/types/supabase'
+import { 
+  Client, 
+  Instructor, 
+  Address, 
+  Availability, 
+  Booking,
+  Student,
+  ClientInsert,
+  InstructorInsert,
+  AddressInsert,
+  AvailabilityInsert,
+  BookingInsert,
+  StudentInsert
+} from '@/lib/types/supabase'
 
 // Type aliases for data insert operations
 export type AddressInput = Partial<Omit<Address, 'id'>> & {
@@ -36,6 +49,12 @@ export type BookingInput = Partial<Omit<Booking, 'id'>> & {
   end_time: string;
 }
 
+export type StudentInput = Partial<Omit<Student, 'id'>> & {
+  first_name: string;
+  client_id: string;
+  birthdate: string;
+}
+
 interface DataContextType {
   // Data collections
   instructors: Instructor[]
@@ -43,6 +62,7 @@ interface DataContextType {
   addresses: Address[]
   availabilities: Availability[]
   bookings: Booking[]
+  students: Student[]
   
   // Loading states
   loading: {
@@ -51,6 +71,7 @@ interface DataContextType {
     addresses: boolean
     availabilities: boolean
     bookings: boolean
+    students: boolean
   }
   
   // Actions
@@ -59,6 +80,7 @@ interface DataContextType {
   createAddress: (addressData: AddressInput) => Promise<Address | null>
   createAvailability: (availabilityData: AvailabilityInput) => Promise<Availability | null>
   createBooking: (bookingData: BookingInput) => Promise<Booking | null>
+  createStudent: (studentData: StudentInput) => Promise<Student | null>
 }
 
 // Create context with default values
@@ -68,18 +90,21 @@ const DataContext = createContext<DataContextType>({
   addresses: [],
   availabilities: [],
   bookings: [],
+  students: [],
   loading: {
     instructors: true,
     clients: true,
     addresses: true,
     availabilities: true,
-    bookings: true
+    bookings: true,
+    students: true
   },
   createClient: async () => null,
   createInstructor: async () => null,
   createAddress: async () => null,
   createAvailability: async () => null,
-  createBooking: async () => null
+  createBooking: async () => null,
+  createStudent: async () => null
 })
 
 // Hook for using the data context
@@ -95,6 +120,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [addresses, setAddresses] = useState<Address[]>([])
   const [availabilities, setAvailabilities] = useState<Availability[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
+  const [students, setStudents] = useState<Student[]>([])
   
   // Loading states
   const [loading, setLoading] = useState({
@@ -102,7 +128,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     clients: true,
     addresses: true,
     availabilities: true,
-    bookings: true
+    bookings: true,
+    students: true
   })
 
   // Initial data loading
@@ -130,6 +157,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setClients(clientData || [])
         setLoading(prev => ({ ...prev, clients: false }))
         
+        // Load students
+        const { data: studentData } = await supabase
+          .from('student')
+          .select('*')
+        setStudents(studentData || [])
+        setLoading(prev => ({ ...prev, students: false }))
+        
         // Load availabilities
         const { data: availabilityData } = await supabase
           .from('availability')
@@ -144,7 +178,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setBookings(bookingData || [])
         setLoading(prev => ({ ...prev, bookings: false }))
       } catch (error) {
-        console.error('Error loading initial data:', error)
+        console.error('Error loading data:', error)
+        // Set all loading states to false even on error
+        setLoading({
+          instructors: false,
+          clients: false,
+          addresses: false,
+          availabilities: false,
+          bookings: false,
+          students: false
+        })
       }
     }
     
@@ -293,6 +336,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
       )
       .subscribe()
     
+    // Student subscription
+    const studentSubscription = supabase
+      .channel('student_changes')
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'student' },
+        (payload) => {
+          const newStudent = payload.new as Student
+          setStudents(prev => [...prev, newStudent])
+        }
+      )
+      .on('postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'student' },
+        (payload) => {
+          const updatedStudent = payload.new as Student
+          setStudents(prev => prev.map(student => 
+            student.id === updatedStudent.id ? updatedStudent : student
+          ))
+        }
+      )
+      .on('postgres_changes', 
+        { event: 'DELETE', schema: 'public', table: 'student' },
+        (payload) => {
+          const deletedStudent = payload.old as Student
+          setStudents(prev => prev.filter(student => student.id !== deletedStudent.id))
+        }
+      )
+      .subscribe()
+    
     // Cleanup subscriptions
     return () => {
       supabase.removeChannel(addressSubscription)
@@ -300,6 +371,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       supabase.removeChannel(instructorSubscription)
       supabase.removeChannel(availabilitySubscription)
       supabase.removeChannel(bookingSubscription)
+      supabase.removeChannel(studentSubscription)
     }
   }, [])
   
@@ -384,6 +456,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }
   
+  async function createStudent(studentData: StudentInput) {
+    try {
+      const { data, error } = await supabase
+        .from('student')
+        .insert([studentData])
+        .select()
+        .single()
+      
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('Error creating student:', error)
+      return null
+    }
+  }
+  
   const value = {
     // Data
     instructors,
@@ -391,6 +479,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     addresses,
     availabilities,
     bookings,
+    students,
     // Loading states
     loading,
     // Actions
@@ -398,7 +487,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     createInstructor,
     createAddress,
     createAvailability,
-    createBooking
+    createBooking,
+    createStudent
   }
   
   return (
