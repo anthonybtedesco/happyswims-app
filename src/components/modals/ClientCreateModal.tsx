@@ -193,41 +193,6 @@ export default function ClientCreateModal({ isOpen, onClose }: ClientCreateModal
           <div style={{ display: 'grid', gap: '1rem', marginBottom: '2rem' }}>
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.text.secondary }}>
-                Email
-              </label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '6px',
-                  border: `1px solid ${colors.border.light}`,
-                  backgroundColor: colors.common.white
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.text.secondary }}>
-                Address
-              </label>
-              <AutofillAddress 
-                key={`${formData.address_line}-${formData.city}-${formData.state}-${formData.zip}`}
-                initialData={{
-                  address_line: formData.address_line,
-                  city: formData.city,
-                  state: formData.state,
-                  zip: formData.zip
-                }}
-                onChange={handleAddressChange}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.text.secondary }}>
                 First Name
               </label>
               <input
@@ -261,6 +226,41 @@ export default function ClientCreateModal({ isOpen, onClose }: ClientCreateModal
                   border: `1px solid ${colors.border.light}`,
                   backgroundColor: colors.common.white
                 }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.text.secondary }}>
+                Email
+              </label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: '6px',
+                  border: `1px solid ${colors.border.light}`,
+                  backgroundColor: colors.common.white
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: colors.text.secondary }}>
+                Address
+              </label>
+              <AutofillAddress 
+                key={`${formData.address_line}-${formData.city}-${formData.state}-${formData.zip}`}
+                initialData={{
+                  address_line: formData.address_line,
+                  city: formData.city,
+                  state: formData.state,
+                  zip: formData.zip
+                }}
+                onChange={handleAddressChange}
               />
             </div>
           </div>

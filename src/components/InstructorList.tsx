@@ -72,9 +72,9 @@ export default function InstructorList({
     });
   };
 
-  const isInstructorAvailable = (instructor: InstructorWithTravelTime): boolean => {
+  const isInstructorAvailable = (instructor: InstructorWithTravelTime): boolean | null => {
     if (!startDateTime || !availabilities) {
-      return false;
+      return null; // Time not selected yet
     }
 
     // Get instructor's availabilities
@@ -129,8 +129,37 @@ export default function InstructorList({
     });
   };
 
-  // Filter instructors based on availability
-  const availableInstructors = instructors.filter(instructor => isInstructorAvailable(instructor));
+  const getAvailabilityStatus = (instructor: InstructorWithTravelTime) => {
+    const available = isInstructorAvailable(instructor);
+    
+    if (available === null) {
+      return { text: 'Select time first', color: colors.text.secondary };
+    } else if (available) {
+      return { text: 'Available', color: colors.status.success };
+    } else {
+      return { text: 'Not Available', color: colors.status.error };
+    }
+  };
+
+  // Show all instructors, not just available ones
+  const sortedInstructors = [...instructors].sort((a, b) => {
+    const aAvailable = isInstructorAvailable(a);
+    const bAvailable = isInstructorAvailable(b);
+    
+    // Sort by availability status: available first, then unavailable, then no time selected
+    if (aAvailable === true && bAvailable !== true) return -1;
+    if (bAvailable === true && aAvailable !== true) return 1;
+    if (aAvailable === false && bAvailable === null) return -1;
+    if (bAvailable === false && aAvailable === null) return 1;
+    
+    // If same availability status, sort by travel time if available
+    if (a.travel_time_seconds !== undefined && b.travel_time_seconds !== undefined) {
+      return (a.travel_time_seconds || 0) - (b.travel_time_seconds || 0);
+    }
+    
+    // Finally sort by name
+    return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+  });
 
   return (
     <div style={{ 
@@ -175,48 +204,65 @@ export default function InstructorList({
           </tr>
         </thead>
         <tbody>
-          {availableInstructors.map(instructor => (
-            <tr 
-              key={instructor.id}
-              onClick={() => onInstructorSelect(instructor.id)}
-              style={{
-                cursor: 'pointer',
-                backgroundColor: instructor.id === selectedInstructorId 
-                  ? `${colors.primary[300]}40` 
-                  : 'transparent',
-                borderBottom: `1px solid ${colors.border.light}`,
-                transition: 'background-color 0.2s ease'
-              }}
-            >
-              <td style={{ padding: '0.75rem' }}>
-                {instructor.first_name} {instructor.last_name}
-              </td>
-              <td style={{ padding: '0.75rem' }}>
-                {instructor.specialties || 'No specialties listed'}
-              </td>
-              <td style={{ padding: '0.75rem' }}>
-                {poolAddressId && instructor.travel_time_seconds !== undefined && instructor.travel_time_seconds !== null ? (
-                  formatDuration(instructor.travel_time_seconds)
-                ) : (
-                  'Select a pool first'
-                )}
-              </td>
-              <td style={{ 
-                padding: '0.75rem',
-                color: colors.status.success
-              }}>
-                Available
-              </td>
-            </tr>
-          ))}
-          {availableInstructors.length === 0 && (
+          {sortedInstructors.map(instructor => {
+            const availabilityStatus = getAvailabilityStatus(instructor);
+            const isAvailable = isInstructorAvailable(instructor);
+            const isTimeSelected = isAvailable !== null;
+            
+            return (
+              <tr 
+                key={instructor.id}
+                onClick={() => onInstructorSelect(instructor.id)}
+                style={{
+                  cursor: 'pointer',
+                  backgroundColor: instructor.id === selectedInstructorId 
+                    ? `${colors.primary[300]}40` 
+                    : 'transparent',
+                  borderBottom: `1px solid ${colors.border.light}`,
+                  transition: 'background-color 0.2s ease',
+                  opacity: !isTimeSelected ? 0.6 : isAvailable ? 1 : 0.5
+                }}
+              >
+                <td style={{ 
+                  padding: '0.75rem',
+                  color: !isTimeSelected ? colors.text.secondary : isAvailable ? colors.text.primary : colors.text.disabled
+                }}>
+                  {instructor.first_name} {instructor.last_name}
+                </td>
+                <td style={{ 
+                  padding: '0.75rem',
+                  color: !isTimeSelected ? colors.text.secondary : isAvailable ? colors.text.primary : colors.text.disabled
+                }}>
+                  {instructor.specialties || 'No specialties listed'}
+                </td>
+                <td style={{ 
+                  padding: '0.75rem',
+                  color: !isTimeSelected ? colors.text.secondary : isAvailable ? colors.text.primary : colors.text.disabled
+                }}>
+                  {poolAddressId && instructor.travel_time_seconds !== undefined && instructor.travel_time_seconds !== null ? (
+                    formatDuration(instructor.travel_time_seconds)
+                  ) : (
+                    'Select a pool first'
+                  )}
+                </td>
+                <td style={{ 
+                  padding: '0.75rem',
+                  color: availabilityStatus.color,
+                  fontWeight: isAvailable === true ? '600' : 'normal'
+                }}>
+                  {availabilityStatus.text}
+                </td>
+              </tr>
+            )
+          })}
+          {sortedInstructors.length === 0 && (
             <tr>
               <td colSpan={4} style={{ 
                 padding: '1rem', 
                 textAlign: 'center',
                 color: colors.text.secondary
               }}>
-                No instructors available for the selected time slot
+                No instructors found
               </td>
             </tr>
           )}

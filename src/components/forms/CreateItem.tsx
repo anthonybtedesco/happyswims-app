@@ -3,13 +3,27 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import JoinCreateOrSelect from './JoinCreateOrSelect'
 import MapboxAddressAutofill from './MapboxAddressAutofill'
 import UserIdSelect from './UserIdSelect'
+import DateTimePicker from '@/components/DateTimePicker'
+import { MapComponent, calculateMatrix } from '@/lib/mapbox'
+import InstructorList from '../InstructorList'
 import { useData } from '@/lib/context/DataContext'
 import { AddressInput, ClientInput, InstructorInput, AvailabilityInput, BookingInput, StudentInput } from '@/lib/context/DataContext'
+import { colors, buttonVariants } from '@/lib/colors'
+import AutofillAddress from '@/lib/mapbox/AutofillAddress'
+import { geocodeNewAddress } from '@/lib/geocoding'
+import '@/styles/map.css'
+import { Instructor } from '@/lib/types/supabase'
+
+// Extended instructor type that includes travel time
+type InstructorWithTravelTime = Instructor & {
+  travel_time_seconds?: number | null;
+  specialties?: string;
+}
 
 interface FormField {
   key: string
   label: string
-  type: 'text' | 'email' | 'date' | 'select' | 'color' | 'time' | 'address'
+  type: 'text' | 'email' | 'date' | 'datetime' | 'select' | 'color' | 'time' | 'address'
   required?: boolean
   options?: { value: string; label: string }[]
   defaultValue?: any
@@ -52,15 +66,15 @@ const StudentsManager = React.memo(({ students, onAddStudent, onRemoveStudent, o
         alignItems: 'center',
         marginBottom: '1rem'
       }}>
-        <h3 style={{ margin: 0, color: '#000' }}>Students</h3>
+        <h3 style={{ margin: 0, color: colors.text.primary, fontSize: '1.125rem', fontWeight: '600' }}>Students</h3>
         <button
           type="button"
           onClick={onAddStudent}
           style={{
             padding: '0.5rem 1rem',
-            backgroundColor: '#3b82f6',
-            color: 'white',
-            border: 'none',
+            backgroundColor: buttonVariants.primary.background,
+            color: buttonVariants.primary.text,
+            border: buttonVariants.primary.border,
             borderRadius: '6px',
             cursor: 'pointer',
             fontSize: '14px'
@@ -74,10 +88,10 @@ const StudentsManager = React.memo(({ students, onAddStudent, onRemoveStudent, o
         <div style={{ 
           padding: '2rem', 
           textAlign: 'center', 
-          color: '#6b7280',
-          backgroundColor: '#f9fafb',
-          borderRadius: '6px',
-          border: '1px dashed #d1d5db'
+          color: colors.text.secondary,
+          backgroundColor: colors.gray[50],
+          borderRadius: '8px',
+          border: `2px dashed ${colors.border.light}`
         }}>
           No students added yet. Click "Add Student" to create student records for this client.
         </div>
@@ -85,10 +99,10 @@ const StudentsManager = React.memo(({ students, onAddStudent, onRemoveStudent, o
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {students.map((student, index) => (
             <div key={student.id} style={{
-              padding: '1rem',
-              backgroundColor: '#f9fafb',
-              borderRadius: '6px',
-              border: '1px solid #e5e7eb'
+              padding: '1.5rem',
+              backgroundColor: colors.gray[50],
+              borderRadius: '8px',
+              border: `1px solid ${colors.border.light}`
             }}>
               <div style={{ 
                 display: 'flex', 
@@ -96,18 +110,26 @@ const StudentsManager = React.memo(({ students, onAddStudent, onRemoveStudent, o
                 alignItems: 'center',
                 marginBottom: '1rem'
               }}>
-                <h4 style={{ margin: 0, color: '#000' }}>Student {index + 1}</h4>
+                <h4 style={{ 
+                  margin: 0, 
+                  color: colors.text.primary,
+                  fontSize: '1rem',
+                  fontWeight: '500'
+                }}>
+                  Student {index + 1}
+                </h4>
                 <button
                   type="button"
                   onClick={() => onRemoveStudent(student.id)}
                   style={{
-                    padding: '0.25rem 0.5rem',
-                    backgroundColor: '#ef4444',
-                    color: 'white',
+                    padding: '0.25rem 0.75rem',
+                    backgroundColor: colors.status.error,
+                    color: colors.common.white,
                     border: 'none',
                     borderRadius: '4px',
                     cursor: 'pointer',
-                    fontSize: '12px'
+                    fontSize: '12px',
+                    fontWeight: '500'
                   }}
                 >
                   Remove
@@ -119,7 +141,7 @@ const StudentsManager = React.memo(({ students, onAddStudent, onRemoveStudent, o
                   <label style={{ 
                     display: 'block', 
                     marginBottom: '0.5rem', 
-                    color: '#000',
+                    color: colors.text.secondary,
                     fontSize: '14px',
                     fontWeight: '500'
                   }}>
@@ -131,11 +153,12 @@ const StudentsManager = React.memo(({ students, onAddStudent, onRemoveStudent, o
                     onChange={(e) => onUpdateStudent(student.id, 'first_name', e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '0.5rem',
-                      backgroundColor: '#fff',
-                      color: '#000',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px'
+                      padding: '0.75rem',
+                      backgroundColor: colors.common.white,
+                      color: colors.text.primary,
+                      border: `1px solid ${colors.border.light}`,
+                      borderRadius: '6px',
+                      fontSize: '1rem'
                     }}
                     placeholder="Enter first name"
                   />
@@ -145,7 +168,7 @@ const StudentsManager = React.memo(({ students, onAddStudent, onRemoveStudent, o
                   <label style={{ 
                     display: 'block', 
                     marginBottom: '0.5rem', 
-                    color: '#000',
+                    color: colors.text.secondary,
                     fontSize: '14px',
                     fontWeight: '500'
                   }}>
@@ -157,11 +180,12 @@ const StudentsManager = React.memo(({ students, onAddStudent, onRemoveStudent, o
                     onChange={(e) => onUpdateStudent(student.id, 'birthdate', e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '0.5rem',
-                      backgroundColor: '#fff',
-                      color: '#000',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px'
+                      padding: '0.75rem',
+                      backgroundColor: colors.common.white,
+                      color: colors.text.primary,
+                      border: `1px solid ${colors.border.light}`,
+                      borderRadius: '6px',
+                      fontSize: '1rem'
                     }}
                   />
                 </div>
@@ -184,14 +208,23 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
     createStudent,
     instructors: contextInstructors,
     clients: contextClients,
-    addresses: contextAddresses
+    addresses: contextAddresses,
+    availabilities
   } = useData()
   
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [localOptions, setLocalOptions] = useState(options)
+  const [showAddressForm, setShowAddressForm] = useState(false)
+  const [instructorsWithTravelTime, setInstructorsWithTravelTime] = useState<InstructorWithTravelTime[]>(contextInstructors)
   const isFirstRender = useRef(true)
+
+  // Use a ref to track processing state to prevent infinite loops
+  const isCalculatingRef = useRef(false)
+  // Track which addresses have been processed
+  const processedAddressesRef = useRef<Set<string>>(new Set())
 
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(1)
@@ -208,6 +241,17 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
   // Student management for client creation
   const [students, setStudents] = useState<Array<{id: string, first_name: string, birthdate: string}>>([])
   const [studentIdCounter, setStudentIdCounter] = useState(0)
+
+  // Address form data for inline address creation
+  const [addressData, setAddressData] = useState({
+    address_line: '',
+    city: '',
+    state: '',
+    zip: ''
+  })
+  
+  // Track which address field is being created
+  const [addressFieldContext, setAddressFieldContext] = useState<string>('')
 
   // Add a new student entry
   const addStudent = useCallback(() => {
@@ -250,6 +294,115 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
     
     setLocalOptions(mergedOptions)
   }, [contextInstructors, contextClients, contextAddresses, options])
+
+  // Update instructorsWithTravelTime when instructors change
+  useEffect(() => {
+    setInstructorsWithTravelTime(contextInstructors)
+  }, [contextInstructors])
+
+  // Calculate travel times when pool address is selected (for bookings)
+  useEffect(() => {
+    async function calculateTravelTimes() {
+      // Only calculate for booking forms with pool address
+      if (table !== 'booking' || isCalculatingRef.current) {
+        return
+      }
+      
+      if (!formData.pool_address_id || contextInstructors.length === 0) {
+        setInstructorsWithTravelTime(contextInstructors)
+        return
+      }
+      
+      // Check if we've already processed this address to avoid infinite loops
+      if (processedAddressesRef.current.has(formData.pool_address_id)) {
+        return
+      }
+
+      try {
+        isCalculatingRef.current = true
+        console.log('Calculating travel times for instructors to pool:', formData.pool_address_id)
+        
+        // Find selected pool address
+        const selectedPool = contextAddresses.find(addr => addr.id === formData.pool_address_id)
+        
+        if (!selectedPool || !selectedPool.latitude || !selectedPool.longitude) {
+          console.error('Failed to get coordinates for pool address:', selectedPool)
+          setInstructorsWithTravelTime(contextInstructors)
+          isCalculatingRef.current = false
+          return
+        }
+        
+        // Mark this address as processed to avoid repeated processing
+        processedAddressesRef.current.add(formData.pool_address_id)
+        
+        if (contextInstructors.length === 0) {
+          console.warn('No instructors have valid home address coordinates after processing')
+          setInstructorsWithTravelTime(contextInstructors)
+          isCalculatingRef.current = false
+          return
+        }
+
+        console.log(`Found ${contextInstructors.length} instructors with valid home addresses`)
+
+        // Process instructors in batches of 10
+        const BATCH_SIZE = 10
+        const updatedInstructors: InstructorWithTravelTime[] = [...contextInstructors]
+        const destination = [{ lat: selectedPool.latitude!, lng: selectedPool.longitude! }]
+
+        for (let i = 0; i < contextInstructors.length; i += BATCH_SIZE) {
+          const batch = contextInstructors.slice(i, i + BATCH_SIZE)
+          const sources = batch.map(inst => {
+            const homeAddress = contextAddresses.find(addr => addr.id === inst.home_address_id)
+            return {
+              lat: homeAddress?.latitude,
+              lng: homeAddress?.longitude
+            }
+          }).filter(coord => coord.lat !== undefined && coord.lng !== undefined)
+
+          console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1} with ${sources.length} instructors`)
+          const result = await calculateMatrix(sources as {lat: number, lng: number}[], destination as {lat: number, lng: number}[])
+          
+          // Update instructors in this batch with their travel times
+          batch.forEach((instructor, batchIndex) => {
+            const index = i + batchIndex
+            if (result.durations && result.durations[batchIndex]) {
+              updatedInstructors[index] = {
+                ...instructor,
+                travel_time_seconds: result.durations[batchIndex][0]
+              }
+            }
+          })
+
+          // Add a small delay between batches to avoid rate limiting
+          if (i + BATCH_SIZE < contextInstructors.length) {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+          }
+        }
+
+        // Sort instructors by travel time (instructors without travel time at the end)
+        updatedInstructors.sort((a, b) => {
+          const aTravelTime = 'travel_time_seconds' in a ? a.travel_time_seconds : undefined
+          const bTravelTime = 'travel_time_seconds' in b ? b.travel_time_seconds : undefined
+          
+          if (aTravelTime === undefined && bTravelTime === undefined) return 0
+          if (aTravelTime === undefined) return 1
+          if (bTravelTime === undefined) return -1
+          return aTravelTime! - bTravelTime!
+        })
+
+        console.log('Updated instructors with travel times:', updatedInstructors)
+        setInstructorsWithTravelTime(updatedInstructors)
+      } catch (err) {
+        console.error('Error calculating travel times:', err)
+        setErrorMessage(`Failed to calculate travel times: ${err instanceof Error ? err.message : String(err)}`)
+        setInstructorsWithTravelTime(contextInstructors)
+      } finally {
+        isCalculatingRef.current = false
+      }
+    }
+
+    calculateTravelTimes()
+  }, [table, formData.pool_address_id, contextInstructors, contextAddresses])
 
   // Define form fields based on table
   const getFormFields = (): FormField[] => {
@@ -323,19 +476,19 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
               label: `${client.first_name} ${client.last_name}`
             })) || []
           },
+          { key: 'start_time', label: 'Start Time', type: 'datetime', required: true },
+          { key: 'end_time', label: 'End Time', type: 'datetime', required: true },
           { 
-            key: 'instructor_id', 
-            label: 'Instructor', 
+            key: 'pool_address_id', 
+            label: 'Pool Address', 
             type: 'select',
             required: true,
-            relatedTable: 'instructor',
-            options: localOptions.instructors?.map(instructor => ({
-              value: instructor.id,
-              label: `${instructor.first_name} ${instructor.last_name}`
+            relatedTable: 'address',
+            options: contextAddresses?.map(addr => ({
+              value: addr.id,
+              label: `${addr.address_line}, ${addr.city}, ${addr.state} ${addr.zip}`
             })) || []
           },
-          { key: 'start_time', label: 'Start Time', type: 'date', required: true },
-          { key: 'end_time', label: 'End Time', type: 'date', required: true },
           { 
             key: 'status', 
             label: 'Status', 
@@ -346,6 +499,17 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
               { value: 'cancelled', label: 'Cancelled' }
             ],
             defaultValue: 'scheduled'
+          },
+          { 
+            key: 'instructor_id', 
+            label: 'Instructor', 
+            type: 'select',
+            required: true,
+            relatedTable: 'instructor',
+            options: localOptions.instructors?.map(instructor => ({
+              value: instructor.id,
+              label: `${instructor.first_name} ${instructor.last_name}`
+            })) || []
           }
         ]
       case 'address':
@@ -370,8 +534,8 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
               label: `${instructor.first_name} ${instructor.last_name}`
             })) || []
           },
-          { key: 'start_date', label: 'Start Date', type: 'date', required: true },
-          { key: 'end_date', label: 'End Date', type: 'date', required: true },
+          { key: 'start_date', label: 'Start Date', type: 'datetime', required: true },
+          { key: 'end_date', label: 'End Date', type: 'datetime', required: true },
           { key: 'timerange', label: 'Time Range (e.g., 14:00-16:00)', type: 'text' },
           { key: 'color', label: 'Color', type: 'color', defaultValue: '#10b981' }
         ]
@@ -381,10 +545,22 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
   }
 
   const handleChange = (key: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [key]: value
-    }))
+    setFormData(prev => {
+      const newFormData = {
+        ...prev,
+        [key]: value
+      }
+      
+      // For booking forms, when client_id changes, set pool_address_id to client's home_address_id
+      if (table === 'booking' && key === 'client_id' && value) {
+        const selectedClient = contextClients.find(client => client.id === value)
+        if (selectedClient && selectedClient.home_address_id) {
+          newFormData.pool_address_id = selectedClient.home_address_id
+        }
+      }
+      
+      return newFormData
+    })
   }
 
   const handleCoordinatesChange = (lat: number, lng: number) => {
@@ -408,6 +584,49 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
       state: parts.state,
       zip: parts.zip
     }))
+  }
+
+  // Handle inline address creation
+  const handleAddressSubmit = async () => {
+    try {
+      setErrorMessage('')
+      
+      if (!addressData.address_line || !addressData.city || !addressData.state || !addressData.zip) {
+        setErrorMessage("All address fields are required")
+        return
+      }
+      
+      const coordinates = await geocodeNewAddress(
+        addressData.address_line,
+        addressData.city,
+        addressData.state,
+        addressData.zip
+      )
+      
+      const addressInsertData = {
+        ...addressData,
+        ...(coordinates && { 
+          latitude: coordinates[1],
+          longitude: coordinates[0]
+        })
+      }
+      
+      const newAddress = await createAddress(addressInsertData as AddressInput)
+
+      if (!newAddress) {
+        throw new Error("Failed to create address")
+      }
+
+      // Update the correct field based on context
+      if (addressFieldContext) {
+        setFormData(prev => ({ ...prev, [addressFieldContext]: newAddress.id }))
+      }
+      setShowAddressForm(false)
+      setAddressData({ address_line: '', city: '', state: '', zip: '' })
+      setAddressFieldContext('')
+    } catch (err: any) {
+      setErrorMessage(`Failed to save address: ${err.message || String(err)}`)
+    }
   }
 
   // Validate current step
@@ -469,6 +688,7 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
     
     setIsSubmitting(true)
     setErrorMessage('')
+    setSuccessMessage('')
 
     try {
       const fields = getFormFields()
@@ -560,8 +780,12 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
         throw new Error(`Failed to create ${table}`)
       }
 
+      setSuccessMessage(`${table.charAt(0).toUpperCase() + table.slice(1)} created successfully!`)
       await onSuccess(newItem)
-      onClose()
+      
+      setTimeout(() => {
+        onClose()
+      }, 2000)
     } catch (error: any) {
       console.error('Error creating item:', error)
       setErrorMessage(error.message || 'Failed to create item')
@@ -584,6 +808,25 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
       )
     }
     
+    // Special handling for instructor selection in booking forms
+    if (field.key === 'instructor_id' && table === 'booking') {
+      return (
+        <InstructorList
+          instructors={instructorsWithTravelTime}
+          availabilities={availabilities}
+          selectedInstructorId={value || ''}
+          onInstructorSelect={(id) => {
+            console.log("Selected instructor:", id)
+            handleChange(field.key, id)
+          }}
+          poolAddressId={formData.pool_address_id}
+          startDateTime={formData.start_time}
+          duration={formData.duration || 30}
+          recurrenceWeeks={formData.recurrence_weeks || 0}
+        />
+      )
+    }
+    
     // Check if the field is a foreign key relation (has '_id' in the name)
     if (field.key.includes('_id') && field.relatedTable) {
       // Skip rendering the home_address_id field if we have nested selections for addresses
@@ -592,40 +835,175 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
       }
       
       return (
-        <JoinCreateOrSelect
-          value={value}
-          onChange={(newValue) => {
-            handleChange(field.key, newValue)
-            // If this is a nested selection, update the parent form data
-            if (nestedSelections?.some(nested => nested.table === field.relatedTable)) {
-              handleChange('home_address_id', newValue)
-            }
-          }}
-          relatedTable={field.relatedTable}
-          options={field.options || []}
-          label={field.label}
-          required={field.required}
-          onItemCreated={(newItem) => {
-            // Update form data with the newly created item's ID
-            handleChange(field.key, newItem.id)
-          }}
-          nestedSelections={nestedSelections}
-          addresses={localOptions.addresses}
-        />
+        <div>
+          <JoinCreateOrSelect
+            value={value}
+            onChange={(newValue) => {
+              handleChange(field.key, newValue)
+              // If this is a nested selection, update the parent form data
+              if (nestedSelections?.some(nested => nested.table === field.relatedTable)) {
+                handleChange('home_address_id', newValue)
+              }
+            }}
+            relatedTable={field.relatedTable}
+            options={field.options || []}
+            label={field.label}
+            required={field.required}
+            onItemCreated={(newItem) => {
+              // Update form data with the newly created item's ID
+              handleChange(field.key, newItem.id)
+            }}
+            nestedSelections={nestedSelections}
+            addresses={localOptions.addresses}
+          />
+          
+          {/* Show address creation form for home_address_id */}
+          {(field.key === 'home_address_id' || field.key === 'pool_address_id') && !showAddressForm && (
+            <button
+              type="button"
+              onClick={() => {
+                setAddressFieldContext(field.key)
+                setShowAddressForm(true)
+              }}
+              style={{
+                marginTop: '0.5rem',
+                background: 'none',
+                border: 'none',
+                color: colors.primary[500],
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              + Add New Address
+            </button>
+          )}
+          
+          {/* Map component for address selection */}
+          {(field.key === 'home_address_id' || field.key === 'pool_address_id') && contextAddresses && contextAddresses.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <MapComponent 
+                addresses={contextAddresses} 
+                selectedAddressId={value}
+                onAddressSelect={(addressId) => {
+                  console.log("Address selected from map:", addressId);
+                  handleChange(field.key, addressId);
+                }}
+                height="250px"
+              />
+              <div style={{ 
+                marginTop: '0.5rem', 
+                fontSize: '0.75rem', 
+                color: colors.text.secondary,
+                textAlign: 'right' 
+              }}>
+                {field.key === 'pool_address_id' 
+                  ? 'Click on a marker to select the pool address for this booking.'
+                  : 'Click on a marker to select an address from the map.'
+                }
+              </div>
+            </div>
+          )}
+          
+          {/* Inline address creation form */}
+          {(field.key === 'home_address_id' || field.key === 'pool_address_id') && showAddressForm && (
+            <div style={{ 
+              border: `1px solid ${colors.border.light}`, 
+              padding: '1rem', 
+              borderRadius: '8px',
+              marginTop: '0.5rem',
+              backgroundColor: colors.gray[50]
+            }}>
+              <AutofillAddress />
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={handleAddressSubmit}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: buttonVariants.primary.background,
+                    color: buttonVariants.primary.text,
+                    border: buttonVariants.primary.border,
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Save Address
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddressForm(false)
+                    setAddressData({ address_line: '', city: '', state: '', zip: '' })
+                    setAddressFieldContext('')
+                  }}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: buttonVariants.secondary.background,
+                    color: buttonVariants.secondary.text,
+                    border: `1px solid ${buttonVariants.secondary.border}`,
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )
     }
 
     switch (field.type) {
       case 'address':
         return (
-          <MapboxAddressAutofill
-            value={value}
-            onChange={(newValue) => handleChange(field.key, newValue)}
-            onCoordinatesChange={handleCoordinatesChange}
-            onAddressPartsChange={handleAddressPartsChange}
-            required={field.required}
-            placeholder={`Enter ${field.label}`}
-          />
+          <div>
+            <MapboxAddressAutofill
+              value={value}
+              onChange={(newValue) => handleChange(field.key, newValue)}
+              onCoordinatesChange={handleCoordinatesChange}
+              onAddressPartsChange={handleAddressPartsChange}
+              required={field.required}
+              placeholder={`Enter ${field.label}`}
+            />
+            
+            {/* Show map for address type fields if addresses are available */}
+            {contextAddresses && contextAddresses.length > 0 && (
+              <div style={{ marginTop: '1rem' }}>
+                <MapComponent 
+                  addresses={contextAddresses} 
+                  selectedAddressId={formData.selectedMapAddress || ''}
+                  onAddressSelect={(addressId) => {
+                    console.log("Address selected from map for address field:", addressId);
+                    const selectedAddress = contextAddresses?.find(addr => addr.id === addressId);
+                    if (selectedAddress) {
+                      handleChange(field.key, selectedAddress.address_line);
+                      handleAddressPartsChange({
+                        address_line: selectedAddress.address_line,
+                        city: selectedAddress.city || '',
+                        state: selectedAddress.state || '',
+                        zip: selectedAddress.zip || ''
+                      });
+                      if (selectedAddress.latitude && selectedAddress.longitude) {
+                        handleCoordinatesChange(selectedAddress.latitude, selectedAddress.longitude);
+                      }
+                      // Track selected address for map highlighting
+                      handleChange('selectedMapAddress', addressId);
+                    }
+                  }}
+                  height="250px"
+                />
+                <div style={{ 
+                  marginTop: '0.5rem', 
+                  fontSize: '0.75rem', 
+                  color: colors.text.secondary,
+                  textAlign: 'right' 
+                }}>
+                  Click on a marker to use an existing address, or enter a new one above.
+                </div>
+              </div>
+            )}
+          </div>
         )
       case 'select':
         return (
@@ -635,8 +1013,15 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
             value={value}
             onChange={(e) => handleChange(field.key, e.target.value)}
             required={field.required}
-            className="form-select"
-            style={{ backgroundColor: '#f5f5f5', color: '#000' }}
+            style={{ 
+              width: '100%',
+              padding: '0.75rem',
+              backgroundColor: colors.common.white,
+              color: colors.text.primary,
+              border: `1px solid ${colors.border.light}`,
+              borderRadius: '6px',
+              fontSize: '1rem'
+            }}
           >
             <option value="">Select {field.label}...</option>
             {field.options?.map(option => (
@@ -646,17 +1031,31 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
             ))}
           </select>
         )
+      case 'datetime':
+        return (
+          <DateTimePicker
+            selectedDateTime={value}
+            onChange={(newValue) => handleChange(field.key, newValue)}
+          />
+        )
       case 'date':
         return (
           <input
-            type="datetime-local"
+            type="date"
             id={field.key}
             name={field.key}
             value={value}
             onChange={(e) => handleChange(field.key, e.target.value)}
             required={field.required}
-            className="form-input"
-            style={{ backgroundColor: '#f5f5f5', color: '#000' }}
+            style={{ 
+              width: '100%',
+              padding: '0.75rem',
+              backgroundColor: colors.common.white,
+              color: colors.text.primary,
+              border: `1px solid ${colors.border.light}`,
+              borderRadius: '6px',
+              fontSize: '1rem'
+            }}
           />
         )
       case 'color':
@@ -668,7 +1067,14 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
             value={value}
             onChange={(e) => handleChange(field.key, e.target.value)}
             required={field.required}
-            className="form-input color-input"
+            style={{
+              width: '60px',
+              height: '40px',
+              padding: '0',
+              border: `1px solid ${colors.border.light}`,
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
           />
         )
       default:
@@ -680,8 +1086,15 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
             value={value}
             onChange={(e) => handleChange(field.key, e.target.value)}
             required={field.required}
-            className="form-input"
-            style={{ backgroundColor: '#f5f5f5', color: '#000' }}
+            style={{ 
+              width: '100%',
+              padding: '0.75rem',
+              backgroundColor: colors.common.white,
+              color: colors.text.primary,
+              border: `1px solid ${colors.border.light}`,
+              borderRadius: '6px',
+              fontSize: '1rem'
+            }}
           />
         )
     }
@@ -723,8 +1136,8 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
                 width: '40px',
                 height: '40px',
                 borderRadius: '50%',
-                backgroundColor: isCompleted ? '#10b981' : isActive ? '#3b82f6' : '#e5e7eb',
-                color: isCompleted || isActive ? 'white' : '#6b7280',
+                backgroundColor: isCompleted ? colors.status.success : isActive ? colors.primary[500] : colors.gray[200],
+                color: isCompleted || isActive ? colors.common.white : colors.text.secondary,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -737,7 +1150,7 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
                 marginLeft: '0.5rem',
                 fontSize: '14px',
                 fontWeight: isActive ? 'bold' : 'normal',
-                color: isActive ? '#3b82f6' : '#6b7280'
+                color: isActive ? colors.primary[500] : colors.text.secondary
               }}>
                 {stepLabels[stepNum as keyof typeof stepLabels]}
               </div>
@@ -745,7 +1158,7 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
                 <div style={{
                   width: '30px',
                   height: '2px',
-                  backgroundColor: stepNum < currentStep ? '#10b981' : '#e5e7eb',
+                  backgroundColor: stepNum < currentStep ? colors.status.success : colors.gray[200],
                   marginLeft: '0.5rem'
                 }} />
               )}
@@ -766,7 +1179,7 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
         justifyContent: 'space-between', 
         marginTop: '1.5rem',
         paddingTop: '1rem',
-        borderTop: '1px solid #e5e7eb'
+        borderTop: `1px solid ${colors.border.light}`
       }}>
         <button 
           type="button"
@@ -774,9 +1187,9 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
           disabled={currentStep === 1}
           style={{
             padding: '0.75rem 1.5rem',
-            backgroundColor: currentStep === 1 ? '#f3f4f6' : '#6b7280',
-            color: currentStep === 1 ? '#9ca3af' : 'white',
-            border: 'none',
+            backgroundColor: currentStep === 1 ? colors.gray[100] : buttonVariants.secondary.background,
+            color: currentStep === 1 ? colors.text.disabled : buttonVariants.secondary.text,
+            border: currentStep === 1 ? 'none' : `1px solid ${buttonVariants.secondary.border}`,
             borderRadius: '6px',
             cursor: currentStep === 1 ? 'not-allowed' : 'pointer',
             fontWeight: '500'
@@ -791,9 +1204,9 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
             onClick={handleNextStep}
             style={{
               padding: '0.75rem 1.5rem',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: 'none',
+              backgroundColor: buttonVariants.primary.background,
+              color: buttonVariants.primary.text,
+              border: buttonVariants.primary.border,
               borderRadius: '6px',
               cursor: 'pointer',
               fontWeight: '500'
@@ -807,8 +1220,8 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
             disabled={isSubmitting}
             style={{
               padding: '0.75rem 1.5rem',
-              backgroundColor: isSubmitting ? '#9ca3af' : '#10b981',
-              color: 'white',
+              backgroundColor: isSubmitting ? colors.gray[400] : colors.status.success,
+              color: colors.common.white,
               border: 'none',
               borderRadius: '6px',
               cursor: isSubmitting ? 'not-allowed' : 'pointer',
@@ -827,24 +1240,53 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
     <>
       <StepIndicator />
       
-      {visibleFields.map((field) => (
-        <div key={field.key} className="form-group">
-          <label htmlFor={field.key} style={{ color: '#000' }}>{field.label}</label>
-          {renderField(field)}
-        </div>
-      ))}
+      <div style={{ display: 'grid', gap: '1.5rem', marginBottom: '2rem' }}>
+        {visibleFields.map((field) => (
+          <div key={field.key} style={{ display: 'flex', flexDirection: 'column' }}>
+            <label 
+              htmlFor={field.key} 
+              style={{ 
+                display: 'block', 
+                marginBottom: '0.5rem', 
+                color: colors.text.secondary,
+                fontSize: '14px',
+                fontWeight: '500'
+              }}
+            >
+              {field.label}
+              {field.required && <span style={{ color: colors.status.error }}> *</span>}
+            </label>
+            {renderField(field)}
+          </div>
+        ))}
+      </div>
       
       {isAddressForm && (
-        <div className="auto-populated-fields" style={{ marginTop: '10px', fontSize: '0.85rem', color: '#666' }}>
-          <p>City, state, and ZIP will be auto-populated when you select an address</p>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginTop: '4px' }}>
+        <div style={{ 
+          marginTop: '1rem', 
+          fontSize: '0.875rem', 
+          color: colors.text.secondary,
+          padding: '1rem',
+          backgroundColor: colors.gray[50],
+          borderRadius: '6px',
+          border: `1px solid ${colors.border.light}`
+        }}>
+          <p style={{ margin: '0 0 0.5rem 0', fontWeight: '500' }}>Auto-populated fields</p>
+          <p style={{ margin: '0 0 1rem 0' }}>City, state, and ZIP will be auto-populated when you select an address</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
             <div style={{ flex: 2 }}>
               <input 
                 type="text" 
                 value={formData.city || ''} 
                 readOnly 
-                className="form-input"
-                style={{ backgroundColor: '#f0f0f0', color: '#666', width: '100%' }}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  backgroundColor: colors.gray[100],
+                  color: colors.text.disabled,
+                  border: `1px solid ${colors.border.light}`,
+                  borderRadius: '4px'
+                }}
                 placeholder="City"
               />
             </div>
@@ -853,8 +1295,14 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
                 type="text" 
                 value={formData.state || ''} 
                 readOnly 
-                className="form-input"
-                style={{ backgroundColor: '#f0f0f0', color: '#666', width: '100%' }}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  backgroundColor: colors.gray[100],
+                  color: colors.text.disabled,
+                  border: `1px solid ${colors.border.light}`,
+                  borderRadius: '4px'
+                }}
                 placeholder="State"
               />
             </div>
@@ -863,8 +1311,14 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
                 type="text" 
                 value={formData.zip || ''} 
                 readOnly 
-                className="form-input"
-                style={{ backgroundColor: '#f0f0f0', color: '#666', width: '100%' }}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  backgroundColor: colors.gray[100],
+                  color: colors.text.disabled,
+                  border: `1px solid ${colors.border.light}`,
+                  borderRadius: '4px'
+                }}
                 placeholder="ZIP"
               />
             </div>
@@ -884,28 +1338,56 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
       {isMultiStep ? (
         <StepNavigation />
       ) : (
-        <div className="form-actions">
+        <div style={{ 
+          display: 'flex', 
+          gap: '1rem', 
+          justifyContent: 'flex-end',
+          marginTop: '2rem'
+        }}>
           <button 
             type="button" 
             onClick={onClose}
-            className="cancel-button"
             disabled={isSubmitting}
-            style={{ color: '#000' }}
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: buttonVariants.secondary.background,
+              color: buttonVariants.secondary.text,
+              border: `1px solid ${buttonVariants.secondary.border}`,
+              borderRadius: '6px',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              fontWeight: '500'
+            }}
           >
             Cancel
           </button>
           <button 
             type={noForm ? "button" : "submit"} 
-            className="submit-button"
             disabled={isSubmitting}
-            style={{ color: '#000' }}
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: isSubmitting ? colors.gray[400] : buttonVariants.primary.background,
+              color: buttonVariants.primary.text,
+              border: buttonVariants.primary.border,
+              borderRadius: '6px',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
             onClick={noForm ? handleSubmit : undefined}
           >
-            {isSubmitting ? (
-              <span className="loading-spinner"></span>
-            ) : (
-              'Create'
+            {isSubmitting && (
+              <div style={{
+                width: '16px',
+                height: '16px',
+                border: `2px solid ${colors.common.white}`,
+                borderTop: '2px solid transparent',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }} />
             )}
+            {isSubmitting ? 'Creating...' : 'Create'}
           </button>
         </div>
       )}
@@ -913,35 +1395,92 @@ export default function CreateItem({ table, onClose, onSuccess, options = {}, no
   )
 
   return (
-    <div className="create-form-container" style={{ backgroundColor: '#fff', color: '#000' }}>
-      <div className="create-form-header">
-        <h2>Create {table.charAt(0).toUpperCase() + table.slice(1)}</h2>
-        <button 
-          type="button" 
-          className="close-button"
-          onClick={onClose}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000
+    }}>
+      <div style={{
+        backgroundColor: colors.common.white,
+        borderRadius: '12px',
+        padding: '2rem',
+        maxWidth: '600px',
+        width: '90%',
+        maxHeight: '90vh',
+        overflow: 'auto'
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '2rem'
+        }}>
+          <h2 style={{
+            fontSize: '1.5rem',
+            fontWeight: 'bold',
+            color: colors.text.primary,
+            margin: 0
+          }}>
+            Create {table.charAt(0).toUpperCase() + table.slice(1)}
+          </h2>
+          <button 
+            type="button" 
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '1.5rem',
+              cursor: 'pointer',
+              color: colors.text.secondary
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        {errorMessage && (
+          <div style={{
+            padding: '0.75rem',
+            marginBottom: '1rem',
+            borderRadius: '6px',
+            backgroundColor: colors.status.error + '20',
+            color: colors.status.error,
+            border: `1px solid ${colors.status.error}40`
+          }}>
+            {errorMessage}
+          </div>
+        )}
+
+        {successMessage && (
+          <div style={{
+            padding: '0.75rem',
+            marginBottom: '1rem',
+            borderRadius: '6px',
+            backgroundColor: colors.status.success + '20',
+            color: colors.status.success,
+            border: `1px solid ${colors.status.success}40`
+          }}>
+            {successMessage}
+          </div>
+        )}
+
+        {noForm ? (
+          <div>
+            {formContent}
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            {formContent}
+          </form>
+        )}
       </div>
-
-      {errorMessage && (
-        <div className="error-message" style={{ color: 'red' }}>
-          {errorMessage}
-        </div>
-      )}
-
-      {noForm ? (
-        <div style={{ backgroundColor: '#fff', color: '#000' }}>
-          {formContent}
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} style={{ backgroundColor: '#fff', color: '#000' }}>
-          {formContent}
-        </form>
-      )}
     </div>
   )
 } 
