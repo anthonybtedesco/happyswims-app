@@ -1,0 +1,147 @@
+.container {
+  min-height: 100vh;
+  background: #f9fafb;
+}
+
+.nav {
+  background: white;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.navContent {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+@media (min-width: 640px) {
+  .navContent {
+    padding: 0 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .navContent {
+    padding: 0 2rem;
+  }
+}
+
+.navBar {
+  display: flex;
+  justify-content: space-between;
+  height: 4rem;
+  align-items: center;
+}
+
+.navTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.navRight {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.userEmail {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.signOutButton {
+  background: #dc2626;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  transition: background-color 0.2s ease;
+}
+
+.signOutButton:hover {
+  background: #b91c1c;
+}
+
+.main {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+@media (min-width: 640px) {
+  .main {
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .main {
+    padding: 1.5rem 2rem;
+  }
+}
+
+.content {
+  padding: 1.5rem 0;
+}
+
+.instructorCardSection {
+  margin-bottom: 2rem;
+}
+
+.availabilitySection {
+  margin-top: 2rem;
+}
+
+.sectionTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 1.5rem;
+}
+
+.loadingContainer {
+  min-height: 100vh;
+  background: #f9fafb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loadingContent {
+  text-align: center;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: #3b82f6;
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto;
+}
+
+.loadingText {
+  margin-top: 1rem;
+  color: #6b7280;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.adminSpinner {
+  border-top-color: #3b82f6;
+}
+
+.instructorSpinner {
+  border-top-color: #16a34a;
+}
+
+.clientSpinner {
+  border-top-color: #9333ea;
+} 

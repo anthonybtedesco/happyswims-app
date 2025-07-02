@@ -1,0 +1,399 @@
+.availabilityContainer {
+  padding: 1.5rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.availabilityHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.availabilityTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  color: #111827;
+}
+
+.addAvailabilityButton {
+  background-color: #10b981;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.addAvailabilityButton:hover {
+  background-color: #059669;
+}
+
+.formOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.form {
+  background-color: white;
+  border-radius: 0.5rem;
+  padding: 2rem;
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.form h3 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.formGroup {
+  margin-bottom: 1.5rem;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.formGroup input,
+.formGroup select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.formGroup input:focus,
+.formGroup select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.daysGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.dayCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.875rem;
+}
+
+.dayCheckbox:hover {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.dayCheckbox input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.timeGroup {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.formActions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.cancelButton {
+  padding: 0.75rem 1.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background-color: white;
+  color: #374151;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.cancelButton:hover {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.saveButton {
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.375rem;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.saveButton:hover {
+  background-color: #2563eb;
+}
+
+.saveButton:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.weeklySchedule {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.dayColumn {
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
+}
+
+.dayTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  padding: 0.75rem;
+  background-color: #f9fafb;
+  border-radius: 0.375rem;
+  text-align: center;
+  color: #374151;
+}
+
+.timeSlots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.timeSlot {
+  padding: 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  background-color: white;
+  transition: all 0.2s;
+}
+
+.timeSlot:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+}
+
+.timeSlotInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.timeRange {
+  font-weight: 500;
+  color: #111827;
+  font-size: 0.875rem;
+}
+
+.status {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.active {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.inactive {
+  background-color: #fef2f2;
+  color: #991b1b;
+}
+
+.exception {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.timeSlotActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.editSlotButton {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #3b82f6;
+  border-radius: 0.25rem;
+  background-color: white;
+  color: #3b82f6;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.editSlotButton:hover {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.deleteSlotButton {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #ef4444;
+  border-radius: 0.25rem;
+  background-color: white;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.deleteSlotButton:hover {
+  background-color: #ef4444;
+  color: white;
+}
+
+.emptySlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  color: #9ca3af;
+  font-size: 0.875rem;
+  text-align: center;
+  border: 2px dashed #e5e7eb;
+  border-radius: 0.375rem;
+  background-color: #f9fafb;
+}
+
+.floatingSuccessMessage {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background-color: #10b981;
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  z-index: 1000;
+  animation: slideIn 0.3s ease-out;
+}
+
+.floatingErrorMessage {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background-color: #ef4444;
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  z-index: 1000;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 1024px) {
+  .weeklySchedule {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .weeklySchedule {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .availabilityHeader {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  
+  .addAvailabilityButton {
+    align-self: flex-start;
+  }
+  
+  .form {
+    margin: 1rem;
+    padding: 1.5rem;
+  }
+  
+  .timeGroup {
+    grid-template-columns: 1fr;
+  }
+  
+  .daysGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .formActions {
+    flex-direction: column;
+  }
+  
+  .timeSlotActions {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .weeklySchedule {
+    grid-template-columns: 1fr;
+  }
+  
+  .availabilityContainer {
+    padding: 1rem;
+  }
+} 
