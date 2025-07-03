@@ -27,6 +27,7 @@ export default function AuthCallback() {
 
       if (role === 'none') {
         const signupRole = localStorage.getItem('signup_role') as 'admin' | 'instructor' | 'client' | null
+        const claimPhoneNumber = localStorage.getItem('claim_phone_number')
         
         if (signupRole) {
           const { error: assignError } = await assignUserRole(session.user.id, signupRole)
@@ -38,6 +39,35 @@ export default function AuthCallback() {
           }
           
           localStorage.removeItem('signup_role')
+          
+          if (signupRole === 'instructor' && claimPhoneNumber) {
+            try {
+              const response = await fetch('/api/instructor/link', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({ phoneNumber: claimPhoneNumber })
+              })
+
+              const result = await response.json()
+
+              if (!response.ok) {
+                console.error('Error linking instructor:', result.error)
+                router.push('/instructor/auth')
+                return
+              }
+
+              localStorage.removeItem('claim_phone_number')
+              router.push('/instructor/dashboard')
+              return
+            } catch (error) {
+              console.error('Error linking instructor account:', error)
+              router.push('/instructor/auth')
+              return
+            }
+          }
           
           switch (signupRole) {
             case 'admin':
@@ -56,6 +86,37 @@ export default function AuthCallback() {
           return
         } else {
           router.push('/onboarding')
+          return
+        }
+      }
+
+      const claimPhoneNumber = localStorage.getItem('claim_phone_number')
+      
+      if (role === 'instructor' && claimPhoneNumber) {
+        try {
+          const response = await fetch('/api/instructor/link', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ phoneNumber: claimPhoneNumber })
+          })
+
+          const result = await response.json()
+
+          if (!response.ok) {
+            console.error('Error linking instructor:', result.error)
+            router.push('/instructor/auth')
+            return
+          }
+
+          localStorage.removeItem('claim_phone_number')
+          router.push('/instructor/dashboard')
+          return
+        } catch (error) {
+          console.error('Error linking instructor account:', error)
+          router.push('/instructor/auth')
           return
         }
       }

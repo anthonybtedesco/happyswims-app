@@ -100,6 +100,10 @@ export default function InstructorAuth() {
     setIsLoading(true)
     setMessage('')
     
+    if (activeTab === 'claim' && instructorData) {
+      localStorage.setItem('claim_phone_number', normalizePhoneNumber(phoneNumber))
+    }
+    
     const { error } = await signInWithGoogle('instructor')
     
     if (error) {
@@ -446,6 +450,7 @@ export default function InstructorAuth() {
     setOtp('')
     setMessage('')
     setInstructorData(null)
+    localStorage.removeItem('claim_phone_number')
   }
 
   return (
