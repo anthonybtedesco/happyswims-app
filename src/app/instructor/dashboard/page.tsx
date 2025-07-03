@@ -8,6 +8,7 @@ import InstructorOnboardingModal from '@/components/InstructorOnboardingModal'
 import InstructorCard from '@/components/InstructorCard'
 import Availability from '@/components/Availability'
 import AvailabilityCalendar from '@/components/AvailabilityCalendar'
+import BookingList from '@/components/BookingList'
 import styles from '../../dashboard.module.css'
 
 export default function InstructorDashboard() {
@@ -130,6 +131,10 @@ export default function InstructorDashboard() {
                 ) : (
                   <AvailabilityCalendar instructorId={instructor.id} />
                 )}
+              </div>
+
+              <div className={styles.bookingsSection}>
+                <BookingList instructorId={instructor.id} />
               </div>
             </>
           )}

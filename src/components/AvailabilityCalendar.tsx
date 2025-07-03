@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useRealtime } from '@/hooks/useRealtime'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
@@ -48,30 +49,48 @@ function AvailabilityCalendar({ instructorId, onEventClick }: AvailabilityCalend
   const [availabilities, setAvailabilities] = useState<AvailabilitySlot[]>([])
   const [loading, setLoading] = useState(true)
   const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected')
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(function subscribeRealtime() {
-    if (!instructorId) return
-    
-    const availabilitySub = supabase
-      .channel('availability_changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'availability', 
-        filter: `instructor_id=eq.${instructorId}` 
-      }, (payload: any) => {
-        loadAvailabilities()
-      })
-      .subscribe()
-
-    return function cleanup() {
-      supabase.removeChannel(availabilitySub)
+  useRealtime(
+    {
+      table: 'availability',
+      filter: instructorId ? `instructor_id=eq.${instructorId}` : undefined
+    },
+    {
+      onInsert: (payload) => {
+        console.log('Realtime: New availability slot inserted', payload.new)
+        const newSlot = payload.new as AvailabilitySlot
+        setAvailabilities(prev => [newSlot, ...prev])
+      },
+      onUpdate: (payload) => {
+        console.log('Realtime: Availability slot updated', payload.new)
+        const updatedSlot = payload.new as AvailabilitySlot
+        setAvailabilities(prev => 
+          prev.map(slot => 
+            slot.id === updatedSlot.id ? updatedSlot : slot
+          )
+        )
+      },
+      onDelete: (payload) => {
+        console.log('Realtime: Availability slot deleted', payload.old)
+        const deletedSlot = payload.old as AvailabilitySlot
+        setAvailabilities(prev => 
+          prev.filter(slot => slot.id !== deletedSlot.id)
+        )
+      },
+      onError: (error) => {
+        console.error('Realtime error:', error)
+        setRealtimeStatus('error')
+        setError('Lost connection to realtime updates. Please refresh the page.')
+      }
     }
-  }, [instructorId])
+  )
 
   useEffect(function initialLoad() {
     if (instructorId) {
       loadAvailabilities()
+      setRealtimeStatus('connected')
     }
   }, [instructorId])
 
@@ -79,22 +98,31 @@ function AvailabilityCalendar({ instructorId, onEventClick }: AvailabilityCalend
     if (!instructorId) return
     
     setLoading(true)
+    setError(null)
     
-    const { data, error } = await supabase
-      .from('availability')
-      .select('*')
-      .eq('instructor_id', instructorId)
-      .order('day_of_week', { ascending: true })
-      .order('timerange', { ascending: true })
+    try {
+      const { data, error } = await supabase
+        .from('availability')
+        .select('*')
+        .eq('instructor_id', instructorId)
+        .order('day_of_week', { ascending: true })
+        .order('timerange', { ascending: true })
 
-    if (!error) {
+      if (error) {
+        console.error('Error loading availabilities:', error)
+        setError('Failed to load availability data')
+        return
+      }
+
       console.log('Loaded availabilities:', data)
       setAvailabilities(data || [])
-    } else {
-      console.error('Error loading availabilities:', error)
+      setRealtimeStatus('connected')
+    } catch (err) {
+      console.error('Unexpected error loading availabilities:', err)
+      setError('Unexpected error loading availability data')
+    } finally {
+      setLoading(false)
     }
-    
-    setLoading(false)
   }
 
   function generateEventsForDateRange(startDate: Date, endDate: Date): CalendarEvent[] {
@@ -259,24 +287,44 @@ function AvailabilityCalendar({ instructorId, onEventClick }: AvailabilityCalend
     )
   }
 
+  if (error) {
+    return (
+      <div className={styles.errorContainer}>
+        <p className={styles.errorMessage}>{error}</p>
+        <button onClick={loadAvailabilities} className={styles.retryButton}>
+          Retry
+        </button>
+      </div>
+    )
+  }
+
   const summary = getAvailabilitySummary()
 
   return (
     <div className={styles.calendarContainer}>
       <div className={styles.calendarHeader}>
         <h3 className={styles.calendarTitle}>Availability Calendar</h3>
-        <div className={styles.legend}>
-          <div className={styles.legendItem}>
-            <div className={styles.legendColor} style={{ backgroundColor: '#10b981' }}></div>
-            <span>Active</span>
+        <div className={styles.headerRight}>
+          <div className={styles.realtimeStatus}>
+            <span className={`${styles.statusIndicator} ${styles[realtimeStatus]}`}></span>
+            <span className={styles.statusText}>
+              {realtimeStatus === 'connected' ? 'Live' : 
+               realtimeStatus === 'disconnected' ? 'Connecting...' : 'Connection Error'}
+            </span>
           </div>
-          <div className={styles.legendItem}>
-            <div className={styles.legendColor} style={{ backgroundColor: '#ef4444' }}></div>
-            <span>Inactive</span>
-          </div>
-          <div className={styles.legendItem}>
-            <div className={styles.legendColor} style={{ backgroundColor: '#f59e0b' }}></div>
-            <span>Exception</span>
+          <div className={styles.legend}>
+            <div className={styles.legendItem}>
+              <div className={styles.legendColor} style={{ backgroundColor: '#10b981' }}></div>
+              <span>Active</span>
+            </div>
+            <div className={styles.legendItem}>
+              <div className={styles.legendColor} style={{ backgroundColor: '#ef4444' }}></div>
+              <span>Inactive</span>
+            </div>
+            <div className={styles.legendItem}>
+              <div className={styles.legendColor} style={{ backgroundColor: '#f59e0b' }}></div>
+              <span>Exception</span>
+            </div>
           </div>
         </div>
       </div>

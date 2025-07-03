@@ -1,11 +1,17 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useRealtime } from '@/hooks/useRealtime';
 import styles from './Availability.module.css';
 import { Database } from '@/lib/types/supabase';
 import TimeOffModal from './TimeOffModal';
 
 type AvailabilityStatus = Database['public']['Enums']['AvailabilityStatus'];
+
+interface TimeRange {
+  start: string;
+  end: string;
+}
 
 interface AvailabilitySlot {
   id: string;
@@ -17,11 +23,6 @@ interface AvailabilitySlot {
   end_date: string | null;
   created_at: string;
   updated_at: string;
-}
-
-interface TimeRange {
-  start: string;
-  end: string;
 }
 
 const DAYS_OF_WEEK = [
@@ -48,48 +49,73 @@ function Availability({ instructorId }: AvailabilityProps) {
   const [editingSlot, setEditingSlot] = useState<AvailabilitySlot | null>(null);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [timeRange, setTimeRange] = useState<TimeRange>({ start: '09:00', end: '17:00' });
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
 
-  useEffect(function subscribeRealtime() {
-    if (!instructorId) return;
-    
-    const availabilitySub = supabase
-      .channel('availability_changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'availability', 
-        filter: `instructor_id=eq.${instructorId}` 
-      }, (payload: any) => {
-        loadAvailabilities();
-      })
-      .subscribe();
-
-    return function cleanup() {
-      supabase.removeChannel(availabilitySub);
-    };
-  }, [instructorId]);
+  useRealtime(
+    {
+      table: 'availability',
+      filter: instructorId ? `instructor_id=eq.${instructorId}` : undefined
+    },
+    {
+      onInsert: (payload) => {
+        console.log('Realtime: New availability slot inserted', payload.new);
+        const newSlot = payload.new as AvailabilitySlot;
+        setAvailabilities(prev => [newSlot, ...prev]);
+      },
+      onUpdate: (payload) => {
+        console.log('Realtime: Availability slot updated', payload.new);
+        const updatedSlot = payload.new as AvailabilitySlot;
+        setAvailabilities(prev => 
+          prev.map(slot => 
+            slot.id === updatedSlot.id ? updatedSlot : slot
+          )
+        );
+      },
+      onDelete: (payload) => {
+        console.log('Realtime: Availability slot deleted', payload.old);
+        const deletedSlot = payload.old as AvailabilitySlot;
+        setAvailabilities(prev => 
+          prev.filter(slot => slot.id !== deletedSlot.id)
+        );
+      },
+      onError: (error) => {
+        console.error('Realtime error:', error);
+        setRealtimeStatus('error');
+        setSaveError('Lost connection to realtime updates. Please refresh the page.');
+      }
+    }
+  );
 
   useEffect(function initialLoad() {
     if (instructorId) {
       loadAvailabilities();
+      setRealtimeStatus('connected');
     }
   }, [instructorId]);
 
   async function loadAvailabilities() {
     if (!instructorId) return;
     
-    const { data, error } = await supabase
-      .from('availability')
-      .select('*')
-      .eq('instructor_id', instructorId)
-      .order('day_of_week', { ascending: true })
-      .order('timerange', { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from('availability')
+        .select('*')
+        .eq('instructor_id', instructorId)
+        .order('day_of_week', { ascending: true })
+        .order('timerange', { ascending: true });
 
-    if (!error) {
+      if (error) {
+        console.error('Error loading availabilities:', error);
+        setSaveError('Failed to load availability data');
+        return;
+      }
+
       console.log('Weekly view - Loaded availabilities:', data);
       setAvailabilities(data || []);
-    } else {
-      console.error('Error loading availabilities:', error);
+      setRealtimeStatus('connected');
+    } catch (err) {
+      console.error('Unexpected error loading availabilities:', err);
+      setSaveError('Unexpected error loading availability data');
     }
   }
 
@@ -107,16 +133,22 @@ function Availability({ instructorId }: AvailabilityProps) {
       status: 'ACTIVE' as AvailabilityStatus
     }));
 
-    const { error } = await supabase.from('availability').insert(slotsToSave);
-    setIsSaving(false);
-    
-    if (error) {
-      setSaveError(error.message);
-    } else {
-      setSaveSuccess(true);
-      setShowAddForm(false);
-      resetForm();
-      setTimeout(() => setSaveSuccess(false), 2000);
+    try {
+      const { error } = await supabase.from('availability').insert(slotsToSave);
+      
+      if (error) {
+        setSaveError(error.message);
+      } else {
+        setSaveSuccess(true);
+        setShowAddForm(false);
+        resetForm();
+        setTimeout(() => setSaveSuccess(false), 2000);
+      }
+    } catch (err) {
+      console.error('Unexpected error saving availability:', err);
+      setSaveError('Unexpected error saving availability');
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -124,32 +156,54 @@ function Availability({ instructorId }: AvailabilityProps) {
     setIsSaving(true);
     setSaveError(null);
     
-    const { error } = await supabase
-      .from('availability')
-      .update(updates)
-      .eq('id', slotId);
-    
-    setIsSaving(false);
-    
-    if (error) {
-      setSaveError(error.message);
-    } else {
-      setSaveSuccess(true);
-      setShowAddForm(false);
-      setEditingSlot(null);
-      resetForm();
-      setTimeout(() => setSaveSuccess(false), 2000);
+    try {
+      const { error } = await supabase
+        .from('availability')
+        .update(updates)
+        .eq('id', slotId);
+      
+      if (error) {
+        setSaveError(error.message);
+      } else {
+        setSaveSuccess(true);
+        setShowAddForm(false);
+        setEditingSlot(null);
+        resetForm();
+        setTimeout(() => setSaveSuccess(false), 2000);
+      }
+    } catch (err) {
+      console.error('Unexpected error updating availability:', err);
+      setSaveError('Unexpected error updating availability');
+    } finally {
+      setIsSaving(false);
     }
   }
 
   async function deleteAvailability(id: string) {
-    const { error } = await supabase
-      .from('availability')
-      .delete()
-      .eq('id', id);
-    
-    if (error) {
-      setSaveError(error.message);
+    try {
+      // Optimistic update - remove from UI immediately
+      setAvailabilities(prev => prev.filter(slot => slot.id !== id))
+      
+      const { error } = await supabase
+        .from('availability')
+        .delete()
+        .eq('id', id)
+      
+      if (error) {
+        console.error('Error deleting availability:', error)
+        setSaveError(error.message)
+        // Revert optimistic update on error
+        loadAvailabilities()
+      } else {
+        console.log('Availability slot deleted successfully')
+        setSaveSuccess(true)
+        setTimeout(() => setSaveSuccess(false), 2000)
+      }
+    } catch (err) {
+      console.error('Unexpected error deleting availability:', err)
+      setSaveError('Unexpected error deleting availability')
+      // Revert optimistic update on error
+      loadAvailabilities()
     }
   }
 
@@ -222,8 +276,6 @@ function Availability({ instructorId }: AvailabilityProps) {
   function formatDateRange(startDate: string | null, endDate: string | null) {
     if (!startDate && !endDate) return null;
     
-    console.log('formatDateRange called with:', { startDate, endDate });
-    
     function formatDate(dateString: string) {
       const date = new Date(dateString + 'T00:00:00');
       return date.toLocaleDateString('en-US', {
@@ -235,8 +287,6 @@ function Availability({ instructorId }: AvailabilityProps) {
     
     const start = startDate ? formatDate(startDate) : 'Always';
     const end = endDate ? formatDate(endDate) : 'Ongoing';
-    
-    console.log('formatted dates:', { start, end });
     
     if (startDate && endDate) {
       return `${start} - ${end}`;
@@ -256,6 +306,13 @@ function Availability({ instructorId }: AvailabilityProps) {
       <div className={styles.availabilityHeader}>
         <h2 className={styles.availabilityTitle}>Weekly Availability</h2>
         <div className={styles.headerActions}>
+          <div className={styles.realtimeStatus}>
+            <span className={`${styles.statusIndicator} ${styles[realtimeStatus]}`}></span>
+            <span className={styles.statusText}>
+              {realtimeStatus === 'connected' ? 'Live' : 
+               realtimeStatus === 'disconnected' ? 'Connecting...' : 'Connection Error'}
+            </span>
+          </div>
           <button
             onClick={() => setShowTimeOffModal(true)}
             className={styles.timeOffButton}
@@ -343,36 +400,51 @@ function Availability({ instructorId }: AvailabilityProps) {
       )}
 
       <div className={styles.weeklySchedule}>
-        {sortedAvailabilities.map(slot => (
-          <div key={slot.id} className={styles.timeSlot}>
-            <div className={styles.timeSlotInfo}>
-              <span className={styles.dayOfWeek}>{getDayName(slot.day_of_week)}</span>
-              <span className={styles.timeRange}>{slot.timerange}</span>
-              <span className={`${styles.status} ${styles[slot.status.toLowerCase()]}`}>
-                {slot.status}
-              </span>
-              {formatDateRange(slot.start_date, slot.end_date) && (
-                <span className={styles.dateRange}>
-                  {formatDateRange(slot.start_date, slot.end_date)}
-                </span>
-              )}
+        {DAYS_OF_WEEK.map(day => {
+          const daySlots = sortedAvailabilities.filter(slot => slot.day_of_week === day.value);
+          return (
+            <div key={day.value} className={styles.dayColumn}>
+              <div className={styles.dayTitle}>{day.label}</div>
+              <div className={styles.timeSlots}>
+                {daySlots.length > 0 ? (
+                  daySlots.map(slot => (
+                    <div key={slot.id} className={styles.timeSlot}>
+                      <div className={styles.timeSlotInfo}>
+                        <span className={styles.timeRange}>{slot.timerange}</span>
+                        <span className={`${styles.status} ${styles[slot.status.toLowerCase()]}`}>
+                          {slot.status}
+                        </span>
+                        {formatDateRange(slot.start_date, slot.end_date) && (
+                          <span className={styles.dateRange}>
+                            {formatDateRange(slot.start_date, slot.end_date)}
+                          </span>
+                        )}
+                      </div>
+                      <div className={styles.timeSlotActions}>
+                        <button
+                          onClick={() => editSlot(slot)}
+                          className={styles.editSlotButton}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteAvailability(slot.id)}
+                          className={styles.deleteSlotButton}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className={styles.emptySlot}>
+                    No availability set
+                  </div>
+                )}
+              </div>
             </div>
-            <div className={styles.timeSlotActions}>
-              <button
-                onClick={() => editSlot(slot)}
-                className={styles.editSlotButton}
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => deleteAvailability(slot.id)}
-                className={styles.deleteSlotButton}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {saveSuccess && (
