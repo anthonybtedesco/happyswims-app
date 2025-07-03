@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import InstructorOnboardingModal from '@/components/InstructorOnboardingModal'
 import InstructorCard from '@/components/InstructorCard'
 import Availability from '@/components/Availability'
+import AvailabilityCalendar from '@/components/AvailabilityCalendar'
 import styles from '../../dashboard.module.css'
 
 export default function InstructorDashboard() {
@@ -14,6 +15,7 @@ export default function InstructorDashboard() {
   const [instructor, setInstructor] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [viewMode, setViewMode] = useState<'weekly' | 'calendar'>('weekly')
   const router = useRouter()
 
   useEffect(() => {
@@ -105,8 +107,29 @@ export default function InstructorDashboard() {
               </div>
               
               <div className={styles.availabilitySection}>
-                <h2 className={styles.sectionTitle}>Manage Availability</h2>
-                <Availability instructorId={instructor.id} />
+                <div className={styles.availabilityHeader}>
+                  <h2 className={styles.sectionTitle}>Manage Availability</h2>
+                  <div className={styles.viewToggle}>
+                    <button
+                      className={`${styles.toggleButton} ${viewMode === 'weekly' ? styles.activeToggle : ''}`}
+                      onClick={() => setViewMode('weekly')}
+                    >
+                      Weekly View
+                    </button>
+                    <button
+                      className={`${styles.toggleButton} ${viewMode === 'calendar' ? styles.activeToggle : ''}`}
+                      onClick={() => setViewMode('calendar')}
+                    >
+                      Calendar View
+                    </button>
+                  </div>
+                </div>
+                
+                {viewMode === 'weekly' ? (
+                  <Availability instructorId={instructor.id} />
+                ) : (
+                  <AvailabilityCalendar instructorId={instructor.id} />
+                )}
               </div>
             </>
           )}

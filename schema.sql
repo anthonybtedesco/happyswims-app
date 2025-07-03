@@ -122,6 +122,70 @@ CREATE TYPE "public"."availabilitystatus" AS ENUM (
 ALTER TYPE "public"."availabilitystatus" OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."create_time_off"("p_instructor_id" "uuid", "p_start_date" "date", "p_end_date" "date" DEFAULT NULL::"date") RETURNS "void"
+    LANGUAGE "plpgsql"
+    AS $$
+DECLARE
+    existing_availability RECORD;
+    new_start_date date;
+    new_end_date date;
+BEGIN
+    -- If no end_date provided, set it to a far future date
+    IF p_end_date IS NULL THEN
+        p_end_date := '2099-12-31'::date;
+    END IF;
+
+    -- Find all availabilities that overlap with the time off period
+    FOR existing_availability IN
+        SELECT id, start_date, end_date, day_of_week, timerange, status
+        FROM public.availability
+        WHERE instructor_id = p_instructor_id
+        AND (
+            (start_date IS NULL OR start_date <= p_end_date) AND
+            (end_date IS NULL OR end_date >= p_start_date)
+        )
+    LOOP
+        -- Handle the case where existing availability starts before time off
+        IF existing_availability.start_date IS NULL OR existing_availability.start_date < p_start_date THEN
+            -- Update existing availability to end before time off
+            UPDATE public.availability
+            SET end_date = p_start_date - INTERVAL '1 day'
+            WHERE id = existing_availability.id;
+        END IF;
+
+        -- Handle the case where existing availability ends after time off
+        IF existing_availability.end_date IS NULL OR existing_availability.end_date > p_end_date THEN
+            -- Create new availability starting after time off
+            INSERT INTO public.availability (
+                instructor_id,
+                day_of_week,
+                timerange,
+                status,
+                start_date,
+                end_date
+            ) VALUES (
+                p_instructor_id,
+                existing_availability.day_of_week,
+                existing_availability.timerange,
+                existing_availability.status,
+                p_end_date + INTERVAL '1 day',
+                existing_availability.end_date
+            );
+        END IF;
+
+        -- If existing availability is completely within time off period, delete it
+        IF (existing_availability.start_date IS NULL OR existing_availability.start_date >= p_start_date) AND
+           (existing_availability.end_date IS NULL OR existing_availability.end_date <= p_end_date) THEN
+            DELETE FROM public.availability WHERE id = existing_availability.id;
+        END IF;
+    END LOOP;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."create_time_off"("p_instructor_id" "uuid", "p_start_date" "date", "p_end_date" "date") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."merge_availabilities"() RETURNS "void"
     LANGUAGE "plpgsql"
     AS $$
@@ -202,10 +266,10 @@ CREATE TABLE IF NOT EXISTS "public"."availability" (
     "day_of_week" smallint NOT NULL,
     "timerange" "text" NOT NULL,
     "status" "public"."availabilitystatus" DEFAULT 'ACTIVE'::"public"."availabilitystatus" NOT NULL,
-    "start_date" date,
-    "end_date" date,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "start_date" "date" DEFAULT CURRENT_DATE,
+    "end_date" "date",
     CONSTRAINT "availability_day_of_week_check" CHECK ((("day_of_week" >= 0) AND ("day_of_week" <= 6))),
     CONSTRAINT "availability_timerange_check" CHECK (("timerange" ~ '^[0-2][0-9]:[0-5][0-9]-[0-2][0-9]:[0-5][0-9]$'::"text"))
 );
@@ -906,6 +970,12 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
+
+
+
+GRANT ALL ON FUNCTION "public"."create_time_off"("p_instructor_id" "uuid", "p_start_date" "date", "p_end_date" "date") TO "anon";
+GRANT ALL ON FUNCTION "public"."create_time_off"("p_instructor_id" "uuid", "p_start_date" "date", "p_end_date" "date") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."create_time_off"("p_instructor_id" "uuid", "p_start_date" "date", "p_end_date" "date") TO "service_role";
 
 
 

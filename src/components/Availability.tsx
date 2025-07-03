@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import styles from './Availability.module.css';
 import { Database } from '@/lib/types/supabase';
+import TimeOffModal from './TimeOffModal';
 
 type AvailabilityStatus = Database['public']['Enums']['AvailabilityStatus'];
 
@@ -12,6 +13,8 @@ interface AvailabilitySlot {
   day_of_week: number;
   timerange: string;
   status: AvailabilityStatus;
+  start_date: string | null;
+  end_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +44,7 @@ function Availability({ instructorId }: AvailabilityProps) {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showTimeOffModal, setShowTimeOffModal] = useState(false);
   const [editingSlot, setEditingSlot] = useState<AvailabilitySlot | null>(null);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [timeRange, setTimeRange] = useState<TimeRange>({ start: '09:00', end: '17:00' });
@@ -82,6 +86,7 @@ function Availability({ instructorId }: AvailabilityProps) {
       .order('timerange', { ascending: true });
 
     if (!error) {
+      console.log('Weekly view - Loaded availabilities:', data);
       setAvailabilities(data || []);
     } else {
       console.error('Error loading availabilities:', error);
@@ -187,22 +192,87 @@ function Availability({ instructorId }: AvailabilityProps) {
     return grouped;
   }
 
-  const groupedAvailabilities = groupAvailabilitiesByDay();
+  function getSortedAvailabilities() {
+    return availabilities
+      .filter(slot => slot.start_date) // Only include slots with start_date
+      .sort((a, b) => {
+        // Sort by start_date first
+        const dateA = new Date(a.start_date!);
+        const dateB = new Date(b.start_date!);
+        if (dateA.getTime() !== dateB.getTime()) {
+          return dateA.getTime() - dateB.getTime();
+        }
+        
+        // If same date, sort by day of week
+        if (a.day_of_week !== b.day_of_week) {
+          return a.day_of_week - b.day_of_week;
+        }
+        
+        // If same day, sort by time
+        const timeA = a.timerange.split('-')[0];
+        const timeB = b.timerange.split('-')[0];
+        return timeA.localeCompare(timeB);
+      });
+  }
+
+  function getDayName(dayOfWeek: number) {
+    return DAYS_OF_WEEK.find(day => day.value === dayOfWeek)?.label || 'Unknown';
+  }
+
+  function formatDateRange(startDate: string | null, endDate: string | null) {
+    if (!startDate && !endDate) return null;
+    
+    console.log('formatDateRange called with:', { startDate, endDate });
+    
+    function formatDate(dateString: string) {
+      const date = new Date(dateString + 'T00:00:00');
+      return date.toLocaleDateString('en-US', {
+        month: 'numeric',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+    
+    const start = startDate ? formatDate(startDate) : 'Always';
+    const end = endDate ? formatDate(endDate) : 'Ongoing';
+    
+    console.log('formatted dates:', { start, end });
+    
+    if (startDate && endDate) {
+      return `${start} - ${end}`;
+    } else if (startDate) {
+      return `From ${start}`;
+    } else if (endDate) {
+      return `Until ${end}`;
+    }
+    
+    return null;
+  }
+
+  const sortedAvailabilities = getSortedAvailabilities();
 
   return (
     <div className={styles.availabilityContainer}>
       <div className={styles.availabilityHeader}>
         <h2 className={styles.availabilityTitle}>Weekly Availability</h2>
-        <button
-          onClick={() => {
-            setEditingSlot(null);
-            resetForm();
-            setShowAddForm(true);
-          }}
-          className={styles.addAvailabilityButton}
-        >
-          Add Time Slots
-        </button>
+        <div className={styles.headerActions}>
+          <button
+            onClick={() => setShowTimeOffModal(true)}
+            className={styles.timeOffButton}
+          >
+            Create Time Off
+          </button>
+          <button
+            onClick={() => {
+              setEditingSlot(null);
+              resetForm();
+              setShowAddForm(true);
+            }}
+            className={styles.addAvailabilityButton}
+          >
+            Add Time Slots
+          </button>
+        </div>
       </div>
 
       {showAddForm && (
@@ -273,39 +343,33 @@ function Availability({ instructorId }: AvailabilityProps) {
       )}
 
       <div className={styles.weeklySchedule}>
-        {DAYS_OF_WEEK.map(day => (
-          <div key={day.value} className={styles.dayColumn}>
-            <h4 className={styles.dayTitle}>{day.label}</h4>
-            <div className={styles.timeSlots}>
-              {groupedAvailabilities[day.value]?.map(slot => (
-                <div key={slot.id} className={styles.timeSlot}>
-                  <div className={styles.timeSlotInfo}>
-                    <span className={styles.timeRange}>{slot.timerange}</span>
-                    <span className={`${styles.status} ${styles[slot.status.toLowerCase()]}`}>
-                      {slot.status}
-                    </span>
-                  </div>
-                  <div className={styles.timeSlotActions}>
-                    <button
-                      onClick={() => editSlot(slot)}
-                      className={styles.editSlotButton}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => deleteAvailability(slot.id)}
-                      className={styles.deleteSlotButton}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {(!groupedAvailabilities[day.value] || groupedAvailabilities[day.value].length === 0) && (
-                <div className={styles.emptySlot}>
-                  <span>No availability set</span>
-                </div>
+        {sortedAvailabilities.map(slot => (
+          <div key={slot.id} className={styles.timeSlot}>
+            <div className={styles.timeSlotInfo}>
+              <span className={styles.dayOfWeek}>{getDayName(slot.day_of_week)}</span>
+              <span className={styles.timeRange}>{slot.timerange}</span>
+              <span className={`${styles.status} ${styles[slot.status.toLowerCase()]}`}>
+                {slot.status}
+              </span>
+              {formatDateRange(slot.start_date, slot.end_date) && (
+                <span className={styles.dateRange}>
+                  {formatDateRange(slot.start_date, slot.end_date)}
+                </span>
               )}
+            </div>
+            <div className={styles.timeSlotActions}>
+              <button
+                onClick={() => editSlot(slot)}
+                className={styles.editSlotButton}
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => deleteAvailability(slot.id)}
+                className={styles.deleteSlotButton}
+              >
+                Delete
+              </button>
             </div>
           </div>
         ))}
@@ -322,6 +386,13 @@ function Availability({ instructorId }: AvailabilityProps) {
           {saveError}
         </div>
       )}
+
+      <TimeOffModal
+        isOpen={showTimeOffModal}
+        onClose={() => setShowTimeOffModal(false)}
+        onComplete={loadAvailabilities}
+        instructorId={instructorId || ''}
+      />
     </div>
   );
 }

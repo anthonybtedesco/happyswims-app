@@ -14,7 +14,7 @@ interface MapboxAddressAutofillProps {
   placeholder?: string
 }
 
-const MAPBOX_API_KEY = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
+const MAPBOX_API_KEY = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || ''
 
 export default function MapboxAddressAutofill({
   value,
@@ -104,27 +104,6 @@ export default function MapboxAddressAutofill({
     }
     
     try {
-      const placeName = suggestion.place_name || ''
-      const addressComponents = placeName.split(', ')
-      
-      if (addressComponents.length > 0) {
-        addressParts.address_line = addressComponents[0]
-      }
-      
-      if (addressComponents.length > 1) {
-        addressParts.city = addressComponents[1]
-      }
-      
-      if (addressComponents.length > 2) {
-        const stateZip = addressComponents[2].split(' ')
-        if (stateZip.length >= 1) {
-          addressParts.state = stateZip[0]
-        }
-        if (stateZip.length >= 2) {
-          addressParts.zip = stateZip.slice(1).join(' ')
-        }
-      }
-      
       if (suggestion.context) {
         suggestion.context.forEach((ctx: any) => {
           if (ctx.id.startsWith('place.')) {
@@ -139,6 +118,27 @@ export default function MapboxAddressAutofill({
       
       if (suggestion.address && suggestion.text) {
         addressParts.address_line = `${suggestion.address} ${suggestion.text}`
+      } else if (suggestion.place_name) {
+        const placeName = suggestion.place_name
+        const addressComponents = placeName.split(', ')
+        
+        if (addressComponents.length > 0) {
+          addressParts.address_line = addressComponents[0]
+        }
+        
+        if (addressComponents.length > 1 && !addressParts.city) {
+          addressParts.city = addressComponents[1]
+        }
+        
+        if (addressComponents.length > 2 && !addressParts.state) {
+          const stateZip = addressComponents[2].split(' ')
+          if (stateZip.length >= 1) {
+            addressParts.state = stateZip[0]
+          }
+          if (stateZip.length >= 2 && !addressParts.zip) {
+            addressParts.zip = stateZip.slice(1).join(' ')
+          }
+        }
       }
     } catch (error) {
       console.error('Error parsing address parts:', error)

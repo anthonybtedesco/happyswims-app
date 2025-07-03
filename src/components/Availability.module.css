@@ -21,6 +21,27 @@
   color: #111827;
 }
 
+.headerActions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.timeOffButton {
+  background-color: #ef4444;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.timeOffButton:hover {
+  background-color: #dc2626;
+}
+
 .addAvailabilityButton {
   background-color: #10b981;
   color: white;
@@ -232,6 +253,16 @@
   font-size: 0.875rem;
 }
 
+.dateRange {
+  font-size: 0.875rem;
+  color: #374151;
+  font-weight: 500;
+  background-color: #f3f4f6;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid #e5e7eb;
+}
+
 .status {
   font-size: 0.75rem;
   padding: 0.25rem 0.5rem;
@@ -362,8 +393,14 @@
     align-items: stretch;
   }
   
+  .headerActions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .timeOffButton,
   .addAvailabilityButton {
-    align-self: flex-start;
+    align-self: stretch;
   }
   
   .form {

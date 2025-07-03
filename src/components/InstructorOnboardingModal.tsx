@@ -151,6 +151,22 @@ export default function InstructorOnboardingModal({
     }))
   }
 
+  function formatPhoneNumber(value: string) {
+    const phoneNumber = value.replace(/\D/g, '')
+    if (phoneNumber.length <= 3) {
+      return phoneNumber
+    } else if (phoneNumber.length <= 6) {
+      return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3)}`
+    } else {
+      return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`
+    }
+  }
+
+  function handlePhoneChange(value: string) {
+    const formatted = formatPhoneNumber(value)
+    handleInputChange('phone_number', formatted)
+  }
+
   async function handleNext() {
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1)
@@ -241,8 +257,23 @@ export default function InstructorOnboardingModal({
       case 1:
         return formData.first_name.trim() && formData.last_name.trim()
       case 2:
-        return formData.phone_number.trim()
+        return formData.phone_number.replace(/\D/g, '').length >= 10
       case 3:
+        const hasAnyAddressField = formData.address.address_line.trim() || 
+                                  formData.address.city.trim() || 
+                                  formData.address.state.trim() || 
+                                  formData.address.zip.trim()
+        
+        if (hasAnyAddressField) {
+          console.log('Address validation: At least one field is filled')
+          console.log('Address fields:', {
+            address_line: formData.address.address_line,
+            city: formData.address.city,
+            state: formData.address.state,
+            zip: formData.address.zip
+          })
+        }
+        
         return formData.address.address_line.trim() && 
                formData.address.city.trim() && 
                formData.address.state.trim() && 
@@ -266,15 +297,17 @@ export default function InstructorOnboardingModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000
+        zIndex: 1000,
+        padding: '1rem'
       }}>
         <div style={{
           backgroundColor: 'white',
-          borderRadius: '8px',
+          borderRadius: '12px',
           padding: '2rem',
           maxWidth: '500px',
-          width: '90%',
-          textAlign: 'center'
+          width: '100%',
+          textAlign: 'center',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
         }}>
           <div>Loading instructor data...</div>
         </div>
@@ -293,24 +326,31 @@ export default function InstructorOnboardingModal({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000
+      zIndex: 1000,
+      padding: '1rem'
     }}>
       <div style={{
         backgroundColor: 'white',
-        borderRadius: '8px',
-        padding: '2rem',
+        borderRadius: '12px',
+        padding: '1.5rem',
         maxWidth: '500px',
-        width: '90%',
+        width: '100%',
         maxHeight: '90vh',
-        overflowY: 'auto'
+        overflowY: 'auto',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
       }}>
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '2rem'
+          marginBottom: '1.5rem'
         }}>
-          <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>
+          <h2 style={{ 
+            margin: 0, 
+            fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', 
+            fontWeight: 'bold',
+            color: '#1f2937'
+          }}>
             Complete Your Profile
           </h2>
           <button
@@ -320,7 +360,21 @@ export default function InstructorOnboardingModal({
               border: 'none',
               fontSize: '1.5rem',
               cursor: 'pointer',
-              padding: '0.5rem'
+              padding: '0.5rem',
+              color: '#6b7280',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent'
             }}
           >
             ×
@@ -330,33 +384,39 @@ export default function InstructorOnboardingModal({
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
-          marginBottom: '2rem'
+          marginBottom: '2rem',
+          gap: '0.5rem'
         }}>
           {Array.from({ length: totalSteps }, (_, i) => (
             <div
               key={i}
               style={{
-                width: '30px',
-                height: '30px',
-                borderRadius: '50%',
+                flex: 1,
+                height: '4px',
                 backgroundColor: i + 1 <= currentStep ? '#007bff' : '#e9ecef',
-                color: i + 1 <= currentStep ? 'white' : '#6c757d',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 'bold'
+                borderRadius: '2px',
+                transition: 'background-color 0.3s'
               }}
-            >
-              {i + 1}
-            </div>
+            />
           ))}
         </div>
 
         {currentStep === 1 && (
           <div>
-            <h3 style={{ marginBottom: '1rem' }}>Personal Information</h3>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+            <h3 style={{ 
+              marginBottom: '1.5rem',
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              color: '#374151'
+            }}>Personal Information</h3>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '0.5rem', 
+                fontWeight: '600',
+                color: '#374151',
+                fontSize: '0.875rem'
+              }}>
                 First Name *
               </label>
               <input
@@ -365,16 +425,32 @@ export default function InstructorOnboardingModal({
                 onChange={(e) => handleInputChange('first_name', e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '4px',
-                  border: '1px solid #ddd',
-                  fontSize: '1rem'
+                  padding: '0.875rem',
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
+                  fontSize: '1rem',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                  boxSizing: 'border-box'
                 }}
                 placeholder="Enter your first name"
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#007bff'
+                  e.target.style.boxShadow = '0 0 0 3px rgba(0, 123, 255, 0.1)'
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#d1d5db'
+                  e.target.style.boxShadow = 'none'
+                }}
               />
             </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '0.5rem', 
+                fontWeight: '600',
+                color: '#374151',
+                fontSize: '0.875rem'
+              }}>
                 Last Name *
               </label>
               <input
@@ -383,12 +459,22 @@ export default function InstructorOnboardingModal({
                 onChange={(e) => handleInputChange('last_name', e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '4px',
-                  border: '1px solid #ddd',
-                  fontSize: '1rem'
+                  padding: '0.875rem',
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
+                  fontSize: '1rem',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                  boxSizing: 'border-box'
                 }}
                 placeholder="Enter your last name"
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#007bff'
+                  e.target.style.boxShadow = '0 0 0 3px rgba(0, 123, 255, 0.1)'
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#d1d5db'
+                  e.target.style.boxShadow = 'none'
+                }}
               />
             </div>
           </div>
@@ -396,23 +482,45 @@ export default function InstructorOnboardingModal({
 
         {currentStep === 2 && (
           <div>
-            <h3 style={{ marginBottom: '1rem' }}>Contact Information</h3>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+            <h3 style={{ 
+              marginBottom: '1.5rem',
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              color: '#374151'
+            }}>Contact Information</h3>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '0.5rem', 
+                fontWeight: '600',
+                color: '#374151',
+                fontSize: '0.875rem'
+              }}>
                 Phone Number *
               </label>
               <input
                 type="tel"
                 value={formData.phone_number}
-                onChange={(e) => handleInputChange('phone_number', e.target.value)}
+                onChange={(e) => handlePhoneChange(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '4px',
-                  border: '1px solid #ddd',
-                  fontSize: '1rem'
+                  padding: '0.875rem',
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
+                  fontSize: '1rem',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                  boxSizing: 'border-box'
                 }}
-                placeholder="Enter your phone number"
+                placeholder="(555) 123-4567"
+                autoComplete="tel"
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#007bff'
+                  e.target.style.boxShadow = '0 0 0 3px rgba(0, 123, 255, 0.1)'
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#d1d5db'
+                  e.target.style.boxShadow = 'none'
+                }}
               />
             </div>
           </div>
@@ -420,9 +528,20 @@ export default function InstructorOnboardingModal({
 
         {currentStep === 3 && (
           <div>
-            <h3 style={{ marginBottom: '1rem' }}>Home Address</h3>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+            <h3 style={{ 
+              marginBottom: '1.5rem',
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              color: '#374151'
+            }}>Home Address</h3>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '0.5rem', 
+                fontWeight: '600',
+                color: '#374151',
+                fontSize: '0.875rem'
+              }}>
                 Address *
               </label>
               <MapboxAddressAutofill
@@ -436,12 +555,18 @@ export default function InstructorOnboardingModal({
             </div>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '2fr 1fr',
+              gridTemplateColumns: '1fr 1fr',
               gap: '1rem',
-              marginBottom: '1rem'
+              marginBottom: '1.5rem'
             }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '0.5rem', 
+                  fontWeight: '600',
+                  color: '#374151',
+                  fontSize: '0.875rem'
+                }}>
                   City *
                 </label>
                 <input
@@ -453,16 +578,33 @@ export default function InstructorOnboardingModal({
                   }))}
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '4px',
-                    border: '1px solid #ddd',
-                    fontSize: '1rem'
+                    padding: '0.875rem',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '1rem',
+                    transition: 'border-color 0.2s, box-shadow 0.2s',
+                    boxSizing: 'border-box'
                   }}
                   placeholder="City"
+                  autoComplete="address-level2"
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#007bff'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(0, 123, 255, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db'
+                    e.target.style.boxShadow = 'none'
+                  }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '0.5rem', 
+                  fontWeight: '600',
+                  color: '#374151',
+                  fontSize: '0.875rem'
+                }}>
                   State *
                 </label>
                 <input
@@ -474,17 +616,34 @@ export default function InstructorOnboardingModal({
                   }))}
                   style={{
                     width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '4px',
-                    border: '1px solid #ddd',
-                    fontSize: '1rem'
+                    padding: '0.875rem',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '1rem',
+                    transition: 'border-color 0.2s, box-shadow 0.2s',
+                    boxSizing: 'border-box'
                   }}
                   placeholder="State"
+                  autoComplete="address-level1"
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#007bff'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(0, 123, 255, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db'
+                    e.target.style.boxShadow = 'none'
+                  }}
                 />
               </div>
             </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '0.5rem', 
+                fontWeight: '600',
+                color: '#374151',
+                fontSize: '0.875rem'
+              }}>
                 ZIP Code *
               </label>
               <input
@@ -496,12 +655,23 @@ export default function InstructorOnboardingModal({
                 }))}
                 style={{
                   width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '4px',
-                  border: '1px solid #ddd',
-                  fontSize: '1rem'
+                  padding: '0.875rem',
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
+                  fontSize: '1rem',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                  boxSizing: 'border-box'
                 }}
                 placeholder="ZIP Code"
+                autoComplete="postal-code"
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#007bff'
+                  e.target.style.boxShadow = '0 0 0 3px rgba(0, 123, 255, 0.1)'
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#d1d5db'
+                  e.target.style.boxShadow = 'none'
+                }}
               />
             </div>
           </div>
@@ -510,18 +680,36 @@ export default function InstructorOnboardingModal({
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
-          marginTop: '2rem'
+          marginTop: '2rem',
+          gap: '1rem'
         }}>
           <button
             onClick={handleBack}
             disabled={currentStep === 1}
             style={{
-              padding: '0.75rem 1.5rem',
-              borderRadius: '4px',
-              border: '1px solid #ddd',
+              padding: '0.875rem 1.5rem',
+              borderRadius: '8px',
+              border: '1px solid #d1d5db',
               backgroundColor: 'white',
               cursor: currentStep === 1 ? 'not-allowed' : 'pointer',
-              opacity: currentStep === 1 ? 0.5 : 1
+              opacity: currentStep === 1 ? 0.5 : 1,
+              fontWeight: '600',
+              fontSize: '0.875rem',
+              transition: 'all 0.2s',
+              flex: 1,
+              maxWidth: '120px'
+            }}
+            onMouseEnter={(e) => {
+              if (currentStep !== 1) {
+                e.currentTarget.style.backgroundColor = '#f9fafb'
+                e.currentTarget.style.borderColor = '#9ca3af'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (currentStep !== 1) {
+                e.currentTarget.style.backgroundColor = 'white'
+                e.currentTarget.style.borderColor = '#d1d5db'
+              }
             }}
           >
             Back
@@ -530,13 +718,28 @@ export default function InstructorOnboardingModal({
             onClick={handleNext}
             disabled={!canProceedToNext() || loading}
             style={{
-              padding: '0.75rem 1.5rem',
-              borderRadius: '4px',
+              padding: '0.875rem 1.5rem',
+              borderRadius: '8px',
               border: 'none',
               backgroundColor: canProceedToNext() && !loading ? '#007bff' : '#e9ecef',
               color: 'white',
               cursor: canProceedToNext() && !loading ? 'pointer' : 'not-allowed',
-              opacity: canProceedToNext() && !loading ? 1 : 0.5
+              opacity: canProceedToNext() && !loading ? 1 : 0.5,
+              fontWeight: '600',
+              fontSize: '0.875rem',
+              transition: 'all 0.2s',
+              flex: 1,
+              maxWidth: '120px'
+            }}
+            onMouseEnter={(e) => {
+              if (canProceedToNext() && !loading) {
+                e.currentTarget.style.backgroundColor = '#0056b3'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (canProceedToNext() && !loading) {
+                e.currentTarget.style.backgroundColor = '#007bff'
+              }
             }}
           >
             {loading ? 'Saving...' : currentStep === totalSteps ? 'Complete' : 'Next'}
