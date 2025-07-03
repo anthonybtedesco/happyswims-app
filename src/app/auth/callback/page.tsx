@@ -10,6 +10,12 @@ export default function AuthCallback() {
 
   useEffect(function() {
     async function handleAuthCallback() {
+      if (!supabase) {
+        console.error('Supabase client not initialized')
+        router.push('/')
+        return
+      }
+      
       const { data: { session }, error } = await supabase.auth.getSession()
       
       if (error) {

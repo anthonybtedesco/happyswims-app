@@ -118,6 +118,12 @@ export default function InstructorAuth() {
       return
     }
 
+    if (!supabase) {
+      setMessage('Error: Supabase client not initialized')
+      setIsLoading(false)
+      return
+    }
+
     const { data, error } = await supabase.auth.verifyOtp({
       email,
       token: otp,
@@ -143,6 +149,11 @@ export default function InstructorAuth() {
 
   async function linkInstructorAccount() {
     try {
+      if (!supabase) {
+        setMessage('Error: Supabase client not initialized')
+        return
+      }
+      
       const { data: { session } } = await supabase.auth.getSession()
       
       if (!session?.access_token) {

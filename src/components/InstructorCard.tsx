@@ -40,6 +40,10 @@ function InstructorCard({ instructorId, className = '' }: InstructorCardProps) {
         setLoading(true)
         setError(null)
 
+        if (!supabase) {
+          throw new Error('Supabase client not initialized')
+        }
+
         const { data: instructorData, error: instructorError } = await supabase
           .from('instructor')
           .select(`

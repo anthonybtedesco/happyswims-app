@@ -59,6 +59,11 @@ export default function InstructorOnboardingModal({
   async function fetchInstructorData() {
     setInitialLoading(true)
     try {
+      if (!supabase) {
+        console.error('Supabase client not initialized')
+        return
+      }
+      
       const { data: instructor, error: instructorError } = await supabase
         .from('instructor')
         .select('first_name, last_name, phone_number, home_address_id')
@@ -185,6 +190,11 @@ export default function InstructorOnboardingModal({
     setLoading(true)
     
     try {
+      if (!supabase) {
+        console.error('Supabase client not initialized')
+        return
+      }
+      
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       console.log('Current user:', user)
       console.log('Auth error:', authError)
