@@ -6,15 +6,12 @@ type Instructor = Database['public']['Tables']['instructor']['Row']
 type Client = Database['public']['Tables']['client']['Row']
 
 export async function getCurrentUser() {
-  if (!supabase) return null
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) return null
   return user
 }
 
 export async function getUserRole(userId: string) {
-  if (!supabase) return { role: 'none' as const, data: null }
-  
   const [adminResult, instructorResult, clientResult] = await Promise.all([
     supabase.from('admin').select('*').eq('user_id', userId).single(),
     supabase.from('instructor').select('*').eq('user_id', userId).single(),
@@ -29,8 +26,6 @@ export async function getUserRole(userId: string) {
 }
 
 export async function sendOTP(email: string, role?: 'admin' | 'instructor' | 'client') {
-  if (!supabase) return { data: null, error: { message: 'Supabase client not initialized' } }
-  
   if (role) {
     localStorage.setItem('signup_role', role)
   }
@@ -45,8 +40,6 @@ export async function sendOTP(email: string, role?: 'admin' | 'instructor' | 'cl
 }
 
 export async function signInWithGoogle(role?: 'admin' | 'instructor' | 'client') {
-  if (!supabase) return { data: null, error: { message: 'Supabase client not initialized' } }
-  
   if (role) {
     localStorage.setItem('signup_role', role)
   }
@@ -61,13 +54,11 @@ export async function signInWithGoogle(role?: 'admin' | 'instructor' | 'client')
 }
 
 export async function signOut() {
-  if (!supabase) return { error: { message: 'Supabase client not initialized' } }
   const { error } = await supabase.auth.signOut()
   return { error }
 }
 
 export async function assignUserRole(userId: string, role: 'admin' | 'instructor' | 'client') {
-  if (!supabase) return { data: null, error: { message: 'Supabase client not initialized' } }
   const { data, error } = await supabase.from(role).insert({
     user_id: userId,
     created_at: new Date().toISOString()
@@ -76,8 +67,6 @@ export async function assignUserRole(userId: string, role: 'admin' | 'instructor
 }
 
 export async function verifyInstructorPhone(phoneNumber: string) {
-  if (!supabase) return { data: null, error: { message: 'Supabase client not initialized' } }
-  
   const { data, error } = await supabase
     .from('instructor')
     .select('id, first_name, last_name, phone_number, user_id')

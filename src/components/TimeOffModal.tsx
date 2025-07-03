@@ -27,11 +27,6 @@ export default function TimeOffModal({ isOpen, onClose, onComplete, instructorId
       return
     }
 
-    if (!supabase) {
-      setError('Supabase client not initialized')
-      return
-    }
-
     setIsSubmitting(true)
     setError(null)
 

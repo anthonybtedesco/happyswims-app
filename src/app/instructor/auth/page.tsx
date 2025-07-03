@@ -109,17 +109,8 @@ export default function InstructorAuth() {
   }
 
   async function handleVerifyOTP() {
-    setIsLoading(true)
-    setMessage('')
-    
     if (!otp) {
       setMessage('Please enter the OTP code')
-      setIsLoading(false)
-      return
-    }
-
-    if (!supabase) {
-      setMessage('Error: Supabase client not initialized')
       setIsLoading(false)
       return
     }
@@ -149,11 +140,6 @@ export default function InstructorAuth() {
 
   async function linkInstructorAccount() {
     try {
-      if (!supabase) {
-        setMessage('Error: Supabase client not initialized')
-        return
-      }
-      
       const { data: { session } } = await supabase.auth.getSession()
       
       if (!session?.access_token) {

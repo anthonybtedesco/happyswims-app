@@ -54,11 +54,6 @@ export default function InstructorDashboard() {
   async function handleOnboardingComplete() {
     setShowOnboarding(false)
     
-    if (!supabase) {
-      console.error('Supabase client not initialized')
-      return
-    }
-    
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data } = await supabase

@@ -40,10 +40,6 @@ function InstructorCard({ instructorId, className = '' }: InstructorCardProps) {
         setLoading(true)
         setError(null)
 
-        if (!supabase) {
-          throw new Error('Supabase client not initialized')
-        }
-
         const { data: instructorData, error: instructorError } = await supabase
           .from('instructor')
           .select(`
@@ -72,7 +68,6 @@ function InstructorCard({ instructorId, className = '' }: InstructorCardProps) {
         console.log('Raw instructor data:', instructorData)
         console.log('Home address data:', instructorData.home_address)
 
-        // Transform the data to match our interface
         const transformedData: Instructor = {
           id: instructorData.id,
           first_name: instructorData.first_name,

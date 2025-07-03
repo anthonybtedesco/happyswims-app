@@ -50,7 +50,7 @@ function AvailabilityCalendar({ instructorId, onEventClick }: AvailabilityCalend
   const [currentMonth, setCurrentMonth] = useState(new Date())
 
   useEffect(function subscribeRealtime() {
-    if (!instructorId || !supabase) return
+    if (!instructorId) return
     
     const availabilitySub = supabase
       .channel('availability_changes')
@@ -76,7 +76,7 @@ function AvailabilityCalendar({ instructorId, onEventClick }: AvailabilityCalend
   }, [instructorId])
 
   async function loadAvailabilities() {
-    if (!instructorId || !supabase) return
+    if (!instructorId) return
     
     setLoading(true)
     

@@ -50,7 +50,7 @@ function Availability({ instructorId }: AvailabilityProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>({ start: '09:00', end: '17:00' });
 
   useEffect(function subscribeRealtime() {
-    if (!instructorId || !supabase) return;
+    if (!instructorId) return;
     
     const availabilitySub = supabase
       .channel('availability_changes')
@@ -76,7 +76,7 @@ function Availability({ instructorId }: AvailabilityProps) {
   }, [instructorId]);
 
   async function loadAvailabilities() {
-    if (!instructorId || !supabase) return;
+    if (!instructorId) return;
     
     const { data, error } = await supabase
       .from('availability')
@@ -94,7 +94,7 @@ function Availability({ instructorId }: AvailabilityProps) {
   }
 
   async function saveAvailability() {
-    if (!instructorId || selectedDays.length === 0 || !supabase) return;
+    if (!instructorId || selectedDays.length === 0) return;
     
     setIsSaving(true);
     setSaveError(null);
@@ -121,8 +121,6 @@ function Availability({ instructorId }: AvailabilityProps) {
   }
 
   async function updateAvailability(slotId: string, updates: Partial<AvailabilitySlot>) {
-    if (!supabase) return;
-    
     setIsSaving(true);
     setSaveError(null);
     
@@ -145,8 +143,6 @@ function Availability({ instructorId }: AvailabilityProps) {
   }
 
   async function deleteAvailability(id: string) {
-    if (!supabase) return;
-    
     const { error } = await supabase
       .from('availability')
       .delete()
